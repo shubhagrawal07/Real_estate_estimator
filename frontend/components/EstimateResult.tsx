@@ -4,21 +4,30 @@ import styles from './EstimateResult.module.css';
 
 interface EstimateResultProps {
   estimate: {
-    id: number;
+    propertyId?: string;
     address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    estimatedPrice: number;
-    squareFeet: number;
+    postalCode: number;
+    department: string;
+    municipality: string;
+    cadastralSection?: string;
+    estimatedPrice?: number;
+    area: number;
     bedrooms: number;
     bathrooms: number;
-    createdAt: string;
+    floors?: number;
+    type?: string;
+    hasBalcony?: boolean;
+    hasParking?: boolean;
+    ownershipType?: string;
+    deadline?: string;
+    condition?: string;
+    createdDate?: string;
   };
 }
 
 export default function EstimateResult({ estimate }: EstimateResultProps) {
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | undefined) => {
+    if (!price) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -26,44 +35,87 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
     }).format(price);
   };
 
-  const pricePerSqFt = Math.round(estimate.estimatedPrice / estimate.squareFeet);
+  const pricePerSqM = estimate.estimatedPrice && estimate.area 
+    ? Math.round(estimate.estimatedPrice / estimate.area) 
+    : 0;
 
   return (
     <div className={styles.result}>
       <div className={styles.resultHeader}>
         <h2>Estimated Market Value</h2>
-        <div className={styles.price}>{formatPrice(estimate.estimatedPrice)}</div>
+        <div className={styles.price}>
+          {estimate.estimatedPrice ? formatPrice(estimate.estimatedPrice) : 'Calculating...'}
+        </div>
       </div>
 
       <div className={styles.resultDetails}>
         <div className={styles.detailItem}>
           <span className={styles.detailLabel}>Property Address:</span>
           <span className={styles.detailValue}>
-            {estimate.address}, {estimate.city}, {estimate.state} {estimate.zipCode}
+            {estimate.address}, {estimate.postalCode}
+          </span>
+        </div>
+
+        <div className={styles.detailItem}>
+          <span className={styles.detailLabel}>Location:</span>
+          <span className={styles.detailValue}>
+            {estimate.municipality}, {estimate.department}
+            {estimate.cadastralSection && ` (${estimate.cadastralSection})`}
           </span>
         </div>
 
         <div className={styles.detailGrid}>
           <div className={styles.detailItem}>
-            <span className={styles.detailLabel}>Square Feet:</span>
-            <span className={styles.detailValue}>{estimate.squareFeet.toLocaleString()} sq ft</span>
+            <span className={styles.detailLabel}>Area:</span>
+            <span className={styles.detailValue}>
+              {estimate.area?.toLocaleString() || 'N/A'} m²
+            </span>
+          </div>
+
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>Property Type:</span>
+            <span className={styles.detailValue}>{estimate.type || 'N/A'}</span>
           </div>
 
           <div className={styles.detailItem}>
             <span className={styles.detailLabel}>Bedrooms:</span>
-            <span className={styles.detailValue}>{estimate.bedrooms}</span>
+            <span className={styles.detailValue}>{estimate.bedrooms || 'N/A'}</span>
           </div>
 
           <div className={styles.detailItem}>
             <span className={styles.detailLabel}>Bathrooms:</span>
-            <span className={styles.detailValue}>{estimate.bathrooms}</span>
+            <span className={styles.detailValue}>{estimate.bathrooms || 'N/A'}</span>
           </div>
 
-          <div className={styles.detailItem}>
-            <span className={styles.detailLabel}>Price per Sq Ft:</span>
-            <span className={styles.detailValue}>{formatPrice(pricePerSqFt)}</span>
-          </div>
+          {estimate.floors && (
+            <div className={styles.detailItem}>
+              <span className={styles.detailLabel}>Floors:</span>
+              <span className={styles.detailValue}>{estimate.floors}</span>
+            </div>
+          )}
+
+          {pricePerSqM > 0 && (
+            <div className={styles.detailItem}>
+              <span className={styles.detailLabel}>Price per m²:</span>
+              <span className={styles.detailValue}>{formatPrice(pricePerSqM)}</span>
+            </div>
+          )}
         </div>
+
+        {(estimate.hasBalcony || estimate.hasParking || estimate.condition) && (
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>Features:</span>
+            <span className={styles.detailValue}>
+              {[
+                estimate.hasBalcony && 'Balcony',
+                estimate.hasParking && 'Parking',
+                estimate.condition && `Condition: ${estimate.condition}`,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+            </span>
+          </div>
+        )}
 
         <div className={styles.disclaimer}>
           <p>

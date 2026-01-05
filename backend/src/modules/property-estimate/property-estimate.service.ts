@@ -1,15 +1,22 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
-import { PropertyEstimate } from './property-estimate.model';
+import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus } from './property-estimate.model';
 
 export interface CreatePropertyEstimateDto {
   address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  squareFeet: number;
+  postalCode: number;
+  department: string;
+  municipality: string;
+  cadastralSection: string;
+  type: PropertyType;
+  area: number;
   bedrooms: number;
   bathrooms: number;
-  yearBuilt?: number;
+  floors: number;
+  hasBalcony: boolean;
+  hasParking: boolean;
+  ownershipType: OwnershipType;
+  deadline: Deadline;
+  condition?: string;
 }
 
 export class PropertyEstimateService {
@@ -25,47 +32,88 @@ export class PropertyEstimateService {
     return this.repo.create({
       ...dto,
       estimatedPrice,
+      impressions: 0,
+      status: PropertyStatus.NEW,
     });
   }
 
   private calculatePrice(dto: CreatePropertyEstimateDto): number {
-    let basePricePerSqFt = 150;
+    let basePricePerSqM = 2000; // Base price per square meter
 
-    const cityMultiplier = this.getCityMultiplier(dto.city);
-    basePricePerSqFt *= cityMultiplier;
+    // Department/municipality multiplier (location-based pricing)
+    const locationMultiplier = this.getLocationMultiplier(dto.department, dto.municipality);
+    basePricePerSqM *= locationMultiplier;
 
+    // Property type multiplier
+    const typeMultiplier = dto.type === PropertyType.HOUSE ? 1.2 : 1.0;
+    basePricePerSqM *= typeMultiplier;
+
+    // Bedroom multiplier
     const bedroomMultiplier = 1 + (dto.bedrooms - 2) * 0.1;
+    
+    // Bathroom multiplier
     const bathroomMultiplier = 1 + (dto.bathrooms - 1.5) * 0.15;
 
-    const currentYear = new Date().getFullYear();
-    const age = dto.yearBuilt ? currentYear - dto.yearBuilt : 20;
-    const ageMultiplier = Math.max(0.7, 1 - (age / 100));
+    // Floor multiplier (more floors can add value)
+    const floorMultiplier = 1 + (dto.floors - 1) * 0.05;
+
+    // Feature multipliers
+    const balconyMultiplier = dto.hasBalcony ? 1.1 : 1.0;
+    const parkingMultiplier = dto.hasParking ? 1.15 : 1.0;
+
+    // Ownership and deadline multipliers
+    const ownershipMultiplier = dto.ownershipType === OwnershipType.OWNER ? 1.0 : 0.95;
+    const deadlineMultiplier = dto.deadline === Deadline.IMMEDIATE ? 0.98 : 1.0;
+
+    // Condition multiplier
+    const conditionMultiplier = this.getConditionMultiplier(dto.condition);
 
     const estimatedPrice =
-      dto.squareFeet *
-      basePricePerSqFt *
+      dto.area *
+      basePricePerSqM *
       bedroomMultiplier *
       bathroomMultiplier *
-      ageMultiplier;
+      floorMultiplier *
+      balconyMultiplier *
+      parkingMultiplier *
+      ownershipMultiplier *
+      deadlineMultiplier *
+      conditionMultiplier;
 
     return Math.round(estimatedPrice);
   }
 
-  private getCityMultiplier(city: string): number {
-    const cityMultipliers: { [key: string]: number } = {
-      'New York': 2.5,
-      'San Francisco': 2.8,
-      'Los Angeles': 2.2,
-      'Chicago': 1.3,
-      'Houston': 1.0,
-      'Phoenix': 1.2,
-      'Philadelphia': 1.4,
-      'San Antonio': 1.1,
-      'San Diego': 2.0,
-      'Dallas': 1.2,
+  private getLocationMultiplier(department: string, municipality: string): number {
+    // Simplified location-based pricing
+    // In a real application, this would use more sophisticated location data
+    const locationMultipliers: { [key: string]: number } = {
+      'Paris': 2.5,
+      'Lyon': 1.8,
+      'Marseille': 1.6,
+      'Toulouse': 1.4,
+      'Nice': 1.9,
+      'Nantes': 1.5,
+      'Strasbourg': 1.3,
+      'Montpellier': 1.4,
+      'Bordeaux': 1.6,
+      'Lille': 1.2,
     };
 
-    return cityMultipliers[city] || 1.0;
+    return locationMultipliers[municipality] || locationMultipliers[department] || 1.0;
+  }
+
+  private getConditionMultiplier(condition?: string): number {
+    if (!condition) return 1.0;
+    
+    const conditionMultipliers: { [key: string]: number } = {
+      'excellent': 1.2,
+      'good': 1.0,
+      'fair': 0.85,
+      'poor': 0.7,
+      'needs renovation': 0.6,
+    };
+
+    return conditionMultipliers[condition.toLowerCase()] || 1.0;
   }
 
   async findAll(): Promise<PropertyEstimate[]> {
