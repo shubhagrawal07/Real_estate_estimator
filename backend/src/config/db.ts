@@ -1,5 +1,8 @@
 import { DataSource } from 'typeorm';
 import { PropertyEstimate } from '../modules/property-estimate/property-estimate.model';
+import { User } from '../modules/user/user.model';
+import { Zone } from '../modules/zone/zone.model';
+import { Subscription } from '../modules/subscription/subscription.model';
 import { config } from './env';
 
 export const AppDataSource = new DataSource({
@@ -9,7 +12,7 @@ export const AppDataSource = new DataSource({
   username: config.db.username,
   password: config.db.password,
   database: config.db.database,
-  entities: [PropertyEstimate],
+  entities: [User, PropertyEstimate, Zone, Subscription],
   synchronize: config.nodeEnv !== 'production',
 });
 
