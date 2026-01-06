@@ -16,11 +16,11 @@ export class PropertyEstimateRepo {
 
   async findAll(): Promise<PropertyEstimate[]> {
     return this.repository.find({
-      order: { createdAt: 'DESC' },
+      order: { createdDate: 'DESC' },
     });
   }
 
-  async findOne(id: number): Promise<PropertyEstimate | null> {
-    return this.repository.findOne({ where: { id } });
+  async findOne(id: string): Promise<PropertyEstimate | null> {
+    return this.repository.findOne({ where: { propertyId: id } });
   }
 }

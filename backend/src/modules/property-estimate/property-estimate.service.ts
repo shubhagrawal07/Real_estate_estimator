@@ -120,7 +120,7 @@ export class PropertyEstimateService {
     return this.repo.findAll();
   }
 
-  async findOne(id: number): Promise<PropertyEstimate | null> {
+  async findOne(id: string): Promise<PropertyEstimate | null> {
     return this.repo.findOne(id);
   }
 }
