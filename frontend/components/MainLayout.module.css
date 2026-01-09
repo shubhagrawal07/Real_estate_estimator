@@ -1,0 +1,259 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  z-index: 1000;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  cursor: pointer;
+  margin: 0;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.helpButton,
+.notificationButton,
+.loginButton {
+  background: transparent;
+  border: 1px solid #ddd;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.helpButton:hover,
+.notificationButton:hover,
+.loginButton:hover {
+  background: #f5f7fa;
+  border-color: #667eea;
+}
+
+.notificationButton {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e0e0e0;
+  background: transparent;
+  color: #a8b5e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.notificationButton:hover {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: #a8b5e8;
+  color: #8b9ce6;
+}
+
+.notificationButton svg {
+  width: 20px;
+  height: 20px;
+}
+
+.profileImage {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #667eea;
+}
+
+.profileIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.body {
+  display: flex;
+  margin-top: 64px;
+  min-height: calc(100vh - 64px);
+}
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 64px;
+  width: 250px;
+  height: calc(100vh - 64px);
+  background: white;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, width 0.3s ease;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+  width: 250px;
+}
+
+.sidebar:not(.open) {
+  transform: translateX(-200px);
+  width: 50px;
+}
+
+.sidebarToggle {
+  position: fixed;
+  top: 80px;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 1px solid #ddd;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  color: #667eea;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  z-index: 102;
+  transition: left 0.3s ease;
+}
+
+.sidebarToggle:hover {
+  background: #f5f7fa;
+  border-color: #667eea;
+  transform: translateX(2px);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+  margin-top: 2rem;
+  gap: 0.5rem;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  font-size: 1rem;
+  color: #666;
+}
+
+.navItem:hover {
+  background: #f5f7fa;
+  color: #667eea;
+}
+
+.navItem.active {
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, rgba(102, 126, 234, 0.05) 100%);
+  color: #667eea;
+  border-right: 3px solid #667eea;
+  font-weight: 600;
+}
+
+.navIcon {
+  font-size: 1.25rem;
+  min-width: 24px;
+  text-align: center;
+}
+
+.navLabel {
+  white-space: nowrap;
+}
+
+.main {
+  flex: 1;
+  margin-left: 250px;
+  padding: 2rem;
+  transition: margin-left 0.3s ease;
+}
+
+.sidebar:not(.open) ~ .main {
+  margin-left: 50px;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 1rem;
+  }
+
+  .logo {
+    font-size: 1.25rem;
+  }
+
+  .helpButton,
+  .notificationButton {
+    display: none;
+  }
+
+  .sidebar {
+    width: 200px;
+  }
+
+  .sidebar.open {
+    width: 200px;
+    transform: translateX(0);
+  }
+
+  .sidebar:not(.open) {
+    transform: translateX(-200px);
+    width: 50px;
+  }
+
+  .sidebarToggle {
+    top: 76px;
+  }
+
+  .main {
+    margin-left: 0;
+    padding: 1rem;
+  }
+
+  .sidebar:not(.open) ~ .main {
+    margin-left: 0;
+  }
+}
