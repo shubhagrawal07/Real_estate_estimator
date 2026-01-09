@@ -1,19 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import PropertyEstimateForm from '@/components/PropertyEstimateForm';
-import EstimateResult from '@/components/EstimateResult';
 import styles from './page.module.css';
 
 export default function Home() {
-  const [estimate, setEstimate] = useState<any>(null);
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleEstimate = async (propertyData: any) => {
     setLoading(true);
     setError(null);
-    setEstimate(null);
 
     try {
       const response = await fetch('http://localhost:3001/property-estimate', {
@@ -33,7 +32,11 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setEstimate(data);
+
+      // Persist estimate for landing page and redirect
+      sessionStorage.setItem('latestEstimate', JSON.stringify(data));
+      const idParam = data?.propertyId ? `?propertyId=${encodeURIComponent(data.propertyId)}` : '';
+      router.push(`/landing${idParam}`);
     } catch (err) {
       if (err instanceof TypeError && err.message.includes('fetch')) {
         setError('Cannot connect to server. Please make sure the backend is running on http://localhost:3001');
@@ -63,8 +66,6 @@ export default function Home() {
               <p>Error: {error}</p>
             </div>
           )}
-
-          {estimate && <EstimateResult estimate={estimate} />}
         </div>
       </div>
     </main>

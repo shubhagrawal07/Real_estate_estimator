@@ -1,0 +1,254 @@
+.main {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #e2e8f0;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.addressBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.address {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.ref {
+  font-size: 12px;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+  padding: 4px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.authBtn,
+.backBtn,
+.primary {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.authBtn {
+  background: #0ea5e9;
+  color: #0b1224;
+}
+
+.backBtn {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid rgba(226, 232, 240, 0.2);
+}
+
+.hero {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px;
+}
+
+.primary {
+  background: #0ea5e9;
+  color: #0b1224;
+}
+
+.buyers {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: #f8fafc;
+}
+
+.sectionHeader p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+}
+
+.viewBtn {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.1);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.buyerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.buyerCard {
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.buyerLabel {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.buyerBudget {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.buyerRooms {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 40;
+}
+
+.drawer {
+  width: min(420px, 90vw);
+  background: #0f172a;
+  border-left: 1px solid rgba(148, 163, 184, 0.2);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.35);
+}
+
+.drawerHeader {
+  padding: 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.drawerHeader h3 {
+  margin: 0;
+  color: #f8fafc;
+}
+
+.drawerHeader p {
+  margin: 4px 0 0;
+  color: #94a3b8;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.drawerList {
+  padding: 10px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.drawerItem {
+  display: flex;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.buyerAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b1224;
+  font-weight: 700;
+}
+
+.drawerItemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawerItemTitle {
+  margin: 0;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.drawerItemBudget {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 15px;
+}
+
+.drawerItemMeta {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.drawerFooter {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+

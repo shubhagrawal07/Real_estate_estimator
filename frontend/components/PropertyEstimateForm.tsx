@@ -68,6 +68,7 @@ export default function PropertyEstimateForm({
     deadline: Deadline.NOT_IMMEDIATE,
     condition: '',
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -84,49 +85,90 @@ export default function PropertyEstimateForm({
           ? value === '' ? 0 : Number(value)
           : value,
     }));
+
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   const handleNext = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 4));
+    const validationErrors = validateStep(currentStep);
+    if (Object.keys(validationErrors).length === 0) {
+      setCurrentStep((prev) => Math.min(prev + 1, 3));
+    } else {
+      setErrors(validationErrors);
     }
   };
 
   const handlePrevious = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
+    // Clear errors when going back
+    setErrors({});
   };
 
-  const validateStep = (step: number): boolean => {
+  const validateStep = (step: number): Record<string, string> => {
+    const newErrors: Record<string, string> = {};
+
     switch (step) {
       case 1:
-        return formData.address.trim() !== '' && formData.postalCode > 0;
+        if (!formData.address.trim()) {
+          newErrors.address = 'Street address is required';
+        }
+        if (!formData.postalCode || formData.postalCode <= 0) {
+          newErrors.postalCode = 'Postal code is required and must be greater than 0';
+        } else if (formData.postalCode < 1000 || formData.postalCode > 99999) {
+          newErrors.postalCode = 'Postal code must be between 1000 and 99999';
+        }
+        break;
       case 2:
-        return (
-          formData.department.trim() !== '' &&
-          formData.municipality.trim() !== '' &&
-          formData.cadastralSection.trim() !== ''
-        );
+        if (!formData.department.trim()) {
+          newErrors.department = 'Department is required';
+        }
+        if (!formData.municipality.trim()) {
+          newErrors.municipality = 'Municipality is required';
+        }
+        if (!formData.cadastralSection.trim()) {
+          newErrors.cadastralSection = 'Cadastral section is required';
+        }
+        break;
       case 3:
-        return (
-          formData.area > 0 &&
-          formData.bedrooms >= 1 &&
-          formData.bathrooms >= 1 &&
-          formData.floors >= 1
-        );
+        if (!formData.area || formData.area <= 0) {
+          newErrors.area = 'Area is required and must be greater than 0';
+        }
+        if (!formData.bedrooms || formData.bedrooms < 1) {
+          newErrors.bedrooms = 'Bedrooms is required and must be at least 1';
+        }
+        if (!formData.bathrooms || formData.bathrooms < 1) {
+          newErrors.bathrooms = 'Bathrooms is required and must be at least 1';
+        }
+        if (!formData.floors || formData.floors < 1) {
+          newErrors.floors = 'Floors is required and must be at least 1';
+        }
+        break;
       default:
-        return true;
+        break;
     }
+
+    return newErrors;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateStep(3)) {
+    const validationErrors = validateStep(3);
+    if (Object.keys(validationErrors).length === 0) {
       // Only include condition if it has a value
       const submitData = { ...formData };
       if (!submitData.condition || submitData.condition.trim() === '') {
         delete submitData.condition;
       }
       onSubmit(submitData);
+    } else {
+      setErrors(validationErrors);
     }
   };
 
@@ -139,7 +181,9 @@ export default function PropertyEstimateForm({
       
       <div className={styles.formGrid}>
         <div className={styles.formGroup}>
-          <label htmlFor="address">Street Address *</label>
+          <label htmlFor="address" className={errors.address ? styles.errorLabel : ''}>
+            Street Address *
+          </label>
           <input
             type="text"
             id="address"
@@ -148,11 +192,17 @@ export default function PropertyEstimateForm({
             onChange={handleChange}
             required
             placeholder="123 Main Street"
+            className={errors.address ? styles.errorInput : ''}
           />
+          {errors.address && (
+            <span className={styles.errorMessage}>{errors.address}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="postalCode">Postal Code *</label>
+          <label htmlFor="postalCode" className={errors.postalCode ? styles.errorLabel : ''}>
+            Postal Code *
+          </label>
           <input
             type="number"
             id="postalCode"
@@ -163,7 +213,11 @@ export default function PropertyEstimateForm({
             min="1000"
             max="99999"
             placeholder="75001"
+            className={errors.postalCode ? styles.errorInput : ''}
           />
+          {errors.postalCode && (
+            <span className={styles.errorMessage}>{errors.postalCode}</span>
+          )}
         </div>
       </div>
     </div>
@@ -178,7 +232,9 @@ export default function PropertyEstimateForm({
       
       <div className={styles.formGrid}>
         <div className={styles.formGroup}>
-          <label htmlFor="department">Department *</label>
+          <label htmlFor="department" className={errors.department ? styles.errorLabel : ''}>
+            Department *
+          </label>
           <input
             type="text"
             id="department"
@@ -187,11 +243,17 @@ export default function PropertyEstimateForm({
             onChange={handleChange}
             required
             placeholder="Paris"
+            className={errors.department ? styles.errorInput : ''}
           />
+          {errors.department && (
+            <span className={styles.errorMessage}>{errors.department}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="municipality">Municipality *</label>
+          <label htmlFor="municipality" className={errors.municipality ? styles.errorLabel : ''}>
+            Municipality *
+          </label>
           <input
             type="text"
             id="municipality"
@@ -200,11 +262,17 @@ export default function PropertyEstimateForm({
             onChange={handleChange}
             required
             placeholder="Paris"
+            className={errors.municipality ? styles.errorInput : ''}
           />
+          {errors.municipality && (
+            <span className={styles.errorMessage}>{errors.municipality}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="cadastralSection">Cadastral Section *</label>
+          <label htmlFor="cadastralSection" className={errors.cadastralSection ? styles.errorLabel : ''}>
+            Cadastral Section *
+          </label>
           <input
             type="text"
             id="cadastralSection"
@@ -213,7 +281,11 @@ export default function PropertyEstimateForm({
             onChange={handleChange}
             required
             placeholder="Section A"
+            className={errors.cadastralSection ? styles.errorInput : ''}
           />
+          {errors.cadastralSection && (
+            <span className={styles.errorMessage}>{errors.cadastralSection}</span>
+          )}
         </div>
       </div>
     </div>
@@ -242,7 +314,9 @@ export default function PropertyEstimateForm({
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="area">Area (m²) *</label>
+          <label htmlFor="area" className={errors.area ? styles.errorLabel : ''}>
+            Area (m²) *
+          </label>
           <input
             type="number"
             id="area"
@@ -252,11 +326,17 @@ export default function PropertyEstimateForm({
             required
             min="1"
             placeholder="100"
+            className={errors.area ? styles.errorInput : ''}
           />
+          {errors.area && (
+            <span className={styles.errorMessage}>{errors.area}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="bedrooms">Bedrooms *</label>
+          <label htmlFor="bedrooms" className={errors.bedrooms ? styles.errorLabel : ''}>
+            Bedrooms *
+          </label>
           <input
             type="number"
             id="bedrooms"
@@ -266,11 +346,17 @@ export default function PropertyEstimateForm({
             required
             min="1"
             placeholder="3"
+            className={errors.bedrooms ? styles.errorInput : ''}
           />
+          {errors.bedrooms && (
+            <span className={styles.errorMessage}>{errors.bedrooms}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="bathrooms">Bathrooms *</label>
+          <label htmlFor="bathrooms" className={errors.bathrooms ? styles.errorLabel : ''}>
+            Bathrooms *
+          </label>
           <input
             type="number"
             id="bathrooms"
@@ -280,11 +366,17 @@ export default function PropertyEstimateForm({
             required
             min="1"
             placeholder="2"
+            className={errors.bathrooms ? styles.errorInput : ''}
           />
+          {errors.bathrooms && (
+            <span className={styles.errorMessage}>{errors.bathrooms}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="floors">Floors *</label>
+          <label htmlFor="floors" className={errors.floors ? styles.errorLabel : ''}>
+            Floors *
+          </label>
           <input
             type="number"
             id="floors"
@@ -294,7 +386,11 @@ export default function PropertyEstimateForm({
             required
             min="1"
             placeholder="1"
+            className={errors.floors ? styles.errorInput : ''}
           />
+          {errors.floors && (
+            <span className={styles.errorMessage}>{errors.floors}</span>
+          )}
         </div>
 
         <div className={styles.formGroup}>
@@ -374,7 +470,7 @@ export default function PropertyEstimateForm({
       {/* Step Indicator */}
       <div className={styles.stepIndicator}>
         <div className={styles.stepIndicatorContainer}>
-          {[1, 2, 3, 4].map((step) => (
+          {[1, 2, 3].map((step) => (
             <div key={step} className={styles.stepIndicatorItem}>
               <div
                 className={`${styles.stepCircle} ${
@@ -387,7 +483,6 @@ export default function PropertyEstimateForm({
                 {step === 1 && 'Address'}
                 {step === 2 && 'Location'}
                 {step === 3 && 'Features'}
-                {step === 4 && 'Submit'}
               </div>
             </div>
           ))}
@@ -398,34 +493,6 @@ export default function PropertyEstimateForm({
       {currentStep === 1 && renderStep1()}
       {currentStep === 2 && renderStep2()}
       {currentStep === 3 && renderStep3()}
-      {currentStep === 4 && (
-        <div className={styles.stepContent}>
-          <h2 className={styles.stepTitle}>Review & Submit</h2>
-          <p className={styles.stepDescription}>
-            Please review your information and submit to get your property estimate
-          </p>
-          <div className={styles.reviewSection}>
-            <div className={styles.reviewItem}>
-              <strong>Address:</strong> {formData.address}, {formData.postalCode}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Location:</strong> {formData.municipality}, {formData.department}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Type:</strong> {formData.type}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Area:</strong> {formData.area} m²
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Bedrooms:</strong> {formData.bedrooms} | <strong>Bathrooms:</strong> {formData.bathrooms} | <strong>Floors:</strong> {formData.floors}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Features:</strong> {formData.hasBalcony && 'Balcony '} {formData.hasParking && 'Parking'}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Navigation Buttons */}
       <div className={styles.buttonGroup}>
@@ -439,12 +506,12 @@ export default function PropertyEstimateForm({
             Previous
           </button>
         )}
-        {currentStep < 4 ? (
+        {currentStep < 3 ? (
           <button
             type="button"
             onClick={handleNext}
             className={styles.nextButton}
-            disabled={!validateStep(currentStep) || loading}
+            disabled={loading}
           >
             Next
           </button>
@@ -452,7 +519,7 @@ export default function PropertyEstimateForm({
           <button
             type="submit"
             className={styles.submitButton}
-            disabled={loading || !validateStep(3)}
+            disabled={loading}
           >
             {loading ? 'Calculating...' : 'Get Estimate'}
           </button>
