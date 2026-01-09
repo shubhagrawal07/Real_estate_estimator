@@ -26,14 +26,15 @@ export class PropertyEstimateService {
     this.repo = new PropertyEstimateRepo();
   }
 
-  async createEstimate(dto: CreatePropertyEstimateDto): Promise<PropertyEstimate> {
+  async createEstimate(dto: CreatePropertyEstimateDto, userId?: string): Promise<PropertyEstimate> {
     const estimatedPrice = this.calculatePrice(dto);
 
     return this.repo.create({
       ...dto,
       estimatedPrice,
       impressions: 0,
-      status: PropertyStatus.NEW,
+      status: userId ? PropertyStatus.NEW : PropertyStatus.DRAFT,
+      userId: userId || undefined,
     });
   }
 
@@ -122,5 +123,36 @@ export class PropertyEstimateService {
 
   async findOne(id: string): Promise<PropertyEstimate | null> {
     return this.repo.findOne(id);
+  }
+
+  async recalculateEstimate(propertyId: string): Promise<PropertyEstimate | null> {
+    const estimate = await this.repo.findOne(propertyId);
+    if (!estimate) {
+      return null;
+    }
+
+    // Convert estimate to DTO format for price calculation
+    const dto: CreatePropertyEstimateDto = {
+      address: estimate.address,
+      postalCode: estimate.postalCode,
+      department: estimate.department,
+      municipality: estimate.municipality,
+      cadastralSection: estimate.cadastralSection,
+      type: estimate.type,
+      area: estimate.area,
+      bedrooms: estimate.bedrooms,
+      bathrooms: estimate.bathrooms,
+      floors: estimate.floors,
+      hasBalcony: estimate.hasBalcony,
+      hasParking: estimate.hasParking,
+      ownershipType: estimate.ownershipType,
+      deadline: estimate.deadline,
+      condition: estimate.condition,
+    };
+
+    const newEstimatedPrice = this.calculatePrice(dto);
+    
+    // Update only the estimated price
+    return this.repo.updateEstimatedPrice(propertyId, newEstimatedPrice);
   }
 }
