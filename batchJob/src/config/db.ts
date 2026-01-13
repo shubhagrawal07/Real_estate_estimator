@@ -1,0 +1,24 @@
+import { DataSource } from 'typeorm';
+import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
+import { config } from './env';
+
+export const AppDataSource = new DataSource({
+  type: 'postgres',
+  host: config.db.host,
+  port: config.db.port,
+  username: config.db.username,
+  password: config.db.password,
+  database: config.db.database,
+  entities: [CityBlockSalesData],
+  synchronize: config.nodeEnv !== 'production',
+});
+
+export const initializeDatabase = async (): Promise<void> => {
+  try {
+    await AppDataSource.initialize();
+    console.log('✅ Database connected successfully');
+  } catch (error) {
+    console.error('❌ Error connecting to database:', error);
+    throw error;
+  }
+};
