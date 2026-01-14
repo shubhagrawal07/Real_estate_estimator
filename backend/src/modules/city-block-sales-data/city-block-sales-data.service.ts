@@ -1,6 +1,6 @@
 import { FetchDataParams, SectionMap } from './types';
 import { fetchAndProcessData } from './api.service';
-import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
+import { CityBlockSalesDataRepo } from './city-block-sales-data.repo';
 
 /**
  * Main service function that fetches and processes data

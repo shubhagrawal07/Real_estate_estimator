@@ -35,7 +35,7 @@ async function fetchApiData(url: string): Promise<ApiResponse> {
       );
     }
 
-    const data: ApiResponse = await response.json();
+    const data = (await response.json()) as ApiResponse;
     return data;
   } catch (error) {
     if (error instanceof Error) {

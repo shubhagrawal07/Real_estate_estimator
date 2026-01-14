@@ -3,6 +3,7 @@ import { PropertyEstimate } from '../modules/property-estimate/property-estimate
 import { User } from '../modules/user/user.model';
 import { Zone } from '../modules/zone/zone.model';
 import { Subscription } from '../modules/subscription/subscription.model';
+import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
 import { config } from './env';
 
 export const AppDataSource = new DataSource({
@@ -12,7 +13,7 @@ export const AppDataSource = new DataSource({
   username: config.db.username,
   password: config.db.password,
   database: config.db.database,
-  entities: [User, PropertyEstimate, Zone, Subscription],
+  entities: [User, PropertyEstimate, Zone, Subscription, CityBlockSalesData],
   synchronize: config.nodeEnv !== 'production',
 });
 

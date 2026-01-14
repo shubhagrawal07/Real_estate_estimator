@@ -8,6 +8,7 @@ A full-stack application for estimating real estate property market values. Buil
 - **Modern UI**: Beautiful, responsive landing page with gradient design
 - **RESTful API**: Clean backend API with validation and error handling
 - **Database Integration**: PostgreSQL database to store property estimates
+- **Real Estate Data Processing**: Fetch and process real estate mutation data from French DVF API
 - **User Management**: User accounts with roles (user/agent/admin)
 - **Zone Management**: Zone assignment system for agents
 - **Subscription System**: Trial, basic, and pro subscription tiers
@@ -186,8 +187,17 @@ realEstate_estimator/
 │   │       │   └── property-estimate.model.ts
 │   │       ├── zone/          # Zone module
 │   │       │   └── zone.model.ts
-│   │       └── subscription/  # Subscription module
-│   │           └── subscription.model.ts
+│   │       ├── subscription/  # Subscription module
+│   │       │   └── subscription.model.ts
+│   │       ├── real-estate-data/  # Real estate data processing module
+│   │       │   ├── real-estate-data.routes.ts
+│   │       │   ├── real-estate-data.service.ts
+│   │       │   ├── api.service.ts
+│   │       │   ├── data-processor.service.ts
+│   │       │   └── types.ts
+│   │       └── city-block-sales-data/  # City block sales data module
+│   │           ├── city-block-sales-data.model.ts
+│   │           └── city-block-sales-data.repo.ts
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── env.example
@@ -254,6 +264,25 @@ realEstate_estimator/
 - `paymentStatus`: enum (paid/pending)
 - `netAmountPaid`: int (required)
 
+### City Block Sales Data
+- `id`: UUID (primary key)
+- `department`: VARCHAR(10) - Department code (from DVF API)
+- `code_insee`: VARCHAR(10) - INSEE code (municipality identifier)
+- `section`: VARCHAR(10) - Cadastral section code
+- `anneemut_min`: INT - Minimum mutation year
+- `anneemut_max`: INT - Maximum mutation year
+- `apartment_count`: INT - Number of apartments in this section
+- `apartment_sbati`: NUMERIC - Total built area for apartments (m²)
+- `apartment_sterr`: NUMERIC - Total land area for apartments (m²)
+- `apartment_price`: NUMERIC - Total property value for apartments (€)
+- `mansion_count`: INT - Number of mansions in this section
+- `mansion_sbati`: NUMERIC - Total built area for mansions (m²)
+- `mansion_sterr`: NUMERIC - Total land area for mansions (m²)
+- `mansion_price`: NUMERIC - Total property value for mansions (€)
+- `last_modified_date`: TIMESTAMP - Last update timestamp (auto-updated)
+
+**Unique Constraint**: `(code_insee, section)` - ensures one record per section per municipality.
+
 ## API Endpoints
 
 ### POST /property-estimate
@@ -296,6 +325,57 @@ Get all property estimates.
 
 ### GET /property-estimate/:id
 Get a specific property estimate by ID.
+
+### POST /process-data
+Process real estate mutation data from French DVF API and save to database.
+
+**Request Body:**
+```json
+{
+  "anneemut_min": 2020,
+  "anneemut_max": 2023,
+  "code_insee": "83137"
+}
+```
+
+**Parameters:**
+- `anneemut_min` (number, required): Minimum mutation year (e.g., 2020)
+- `anneemut_max` (number, required): Maximum mutation year (e.g., 2023)
+- `code_insee` (string, required): INSEE code (French municipality identifier, e.g., "83137" for Toulon)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "BE": [
+      {
+        "sterr": 500,
+        "sbati": 1200,
+        "valeurfonc": 250000,
+        "count": 5
+      },
+      {
+        "sterr": 800,
+        "sbati": 2000,
+        "valeurfonc": 450000,
+        "count": 3
+      }
+    ]
+  },
+  "sectionsCount": 1,
+  "message": "Data processed and saved to database successfully"
+}
+```
+
+**What it does:**
+1. Fetches real estate mutation data from the DVF OpenData API
+2. Processes and aggregates data by cadastral sections
+3. Categorizes properties into apartments and mansions
+4. Saves aggregated data to `city_block_sales_data` table
+5. Returns the processed data in the response
+
+**Note**: The data is automatically saved to the database. Each section record is created or updated (upsert) based on the unique combination of `code_insee` and `section`.
 
 ## Price Calculation
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { processRealEstateData } from './real-estate-data.service';
+import { processRealEstateData } from './city-block-sales-data.service';
 import { FetchDataParams } from './types';
 
 const router = Router();
