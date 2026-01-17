@@ -53,14 +53,12 @@ async function saveToDatabase(
   const repo = new CityBlockSalesDataRepo();
   const dataToSave = [];
 
-  for (const [section, entry] of Object.entries(sectionMap)) {
+  for (const [idpar, entry] of Object.entries(sectionMap)) {
     const apartmentData = entry.data[0];
     const mansionData = entry.data[1];
 
     dataToSave.push({
-      department: entry.department,
-      codeInsee: codeInsee,
-      section: section,
+      idpar: idpar,
       anneemutMin: anneemutMin,
       anneemutMax: anneemutMax,
       apartmentCount: apartmentData.count,

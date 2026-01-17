@@ -40,9 +40,8 @@ export interface PropertyData {
 // SectionData is an array of 2 objects: [apartment, mansion]
 export type SectionData = [PropertyData, PropertyData];
 
-// SectionMap with department information
+// SectionMap with property data keyed by idpar
 export interface SectionMapEntry {
-  department: string;
   data: SectionData;
 }
 

@@ -6,12 +6,14 @@ import {
 } from './types';
 
 /**
- * Extract the alphabetical section from l_idpar
- * Example: "83137000BE0330" -> "BE"
+ * Extract the idpar up to the last alphabetical character from l_idpar
+ * Example: "75101000AO0066" -> "75101000AO"
+ * The idpar is combination of code_insee (75101) and cadastralSection (AO)
  */
-function extractSection(idpar: string): string | null {
-  const match = idpar.match(/[A-Z]+/);
-  return match ? match[0] : null;
+function extractIdpar(idparValue: string): string | null {
+  // Match everything up to and including the last alphabetical character
+  const match = idparValue.match(/^(.+[A-Z])/);
+  return match ? match[1] : null;
 }
 
 /**
@@ -57,16 +59,15 @@ export function processMutation(
   }
 
   // Process each l_idpar value
-  for (const idpar of mutation.l_idpar) {
-    const section = extractSection(idpar);
-    if (!section) {
+  for (const idparValue of mutation.l_idpar) {
+    const idpar = extractIdpar(idparValue);
+    if (!idpar) {
       continue;
     }
 
-    // Initialize section if it doesn't exist
-    if (!map[section]) {
-      map[section] = {
-        department: mutation.coddep,
+    // Initialize idpar if it doesn't exist
+    if (!map[idpar]) {
+      map[idpar] = {
         data: initializeSectionData(),
       };
     }
@@ -79,15 +80,15 @@ export function processMutation(
     // Add values to the appropriate type (apartment or mansion)
     // Array index 0 = apartment, index 1 = mansion
     if (isApartment(mutation.libtypbien)) {
-      map[section].data[0].sterr += sterr;
-      map[section].data[0].sbati += sbati;
-      map[section].data[0].valeurfonc += valeurfonc;
-      map[section].data[0].count += 1;
+      map[idpar].data[0].sterr += sterr;
+      map[idpar].data[0].sbati += sbati;
+      map[idpar].data[0].valeurfonc += valeurfonc;
+      map[idpar].data[0].count += 1;
     } else if (isMansion(mutation.libtypbien)) {
-      map[section].data[1].sterr += sterr;
-      map[section].data[1].sbati += sbati;
-      map[section].data[1].valeurfonc += valeurfonc;
-      map[section].data[1].count += 1;
+      map[idpar].data[1].sterr += sterr;
+      map[idpar].data[1].sbati += sbati;
+      map[idpar].data[1].valeurfonc += valeurfonc;
+      map[idpar].data[1].count += 1;
     }
   }
 }

@@ -7,19 +7,13 @@ import {
 } from 'typeorm';
 
 @Entity('city_block_sales_data')
-@Index(['codeInsee', 'section'], { unique: true })
+@Index(['idpar'], { unique: true })
 export class CityBlockSalesData {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 10 })
-  department!: string;
-
-  @Column({ name: 'code_insee', type: 'varchar', length: 10 })
-  codeInsee!: string;
-
-  @Column({ type: 'varchar', length: 10 })
-  section!: string;
+  @Column({ type: 'varchar', length: 20 })
+  idpar!: string;
 
   @Column({ name: 'anneemut_min', type: 'int' })
   anneemutMin!: number;

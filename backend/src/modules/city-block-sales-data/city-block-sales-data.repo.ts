@@ -3,9 +3,7 @@ import { AppDataSource } from '../../config/db';
 import { CityBlockSalesData } from './city-block-sales-data.model';
 
 export interface CityBlockSalesDataInput {
-  department: string;
-  codeInsee: string;
-  section: string;
+  idpar: string;
   anneemutMin: number;
   anneemutMax: number;
   apartmentCount: number;
@@ -27,19 +25,17 @@ export class CityBlockSalesDataRepo {
 
   /**
    * Upsert (insert or update) a city block sales data record
-   * Uses code_insee + section as unique identifier
+   * Uses idpar as unique identifier
    */
   async upsert(data: CityBlockSalesDataInput): Promise<CityBlockSalesData> {
     const existing = await this.repository.findOne({
       where: {
-        codeInsee: data.codeInsee,
-        section: data.section,
+        idpar: data.idpar,
       },
     });
 
     if (existing) {
       // Update existing record
-      existing.department = data.department;
       existing.anneemutMin = data.anneemutMin;
       existing.anneemutMax = data.anneemutMax;
       existing.apartmentCount = data.apartmentCount;
@@ -69,14 +65,12 @@ export class CityBlockSalesDataRepo {
       for (const data of dataArray) {
         const existing = await transactionalEntityManager.findOne(CityBlockSalesData, {
           where: {
-            codeInsee: data.codeInsee,
-            section: data.section,
+            idpar: data.idpar,
           },
         });
 
         if (existing) {
           // Update existing record
-          existing.department = data.department;
           existing.anneemutMin = data.anneemutMin;
           existing.anneemutMax = data.anneemutMax;
           existing.apartmentCount = data.apartmentCount;
@@ -100,27 +94,24 @@ export class CityBlockSalesDataRepo {
   }
 
   /**
-   * Find by code_insee and section
+   * Find by idpar
    */
-  async findByCodeInseeAndSection(
-    codeInsee: string,
-    section: string
-  ): Promise<CityBlockSalesData | null> {
+  async findByIdpar(idpar: string): Promise<CityBlockSalesData | null> {
     return this.repository.findOne({
       where: {
-        codeInsee,
-        section,
+        idpar,
       },
     });
   }
 
   /**
-   * Find all records for a given code_insee
+   * Find all records for a given code_insee (prefix match)
    */
   async findByCodeInsee(codeInsee: string): Promise<CityBlockSalesData[]> {
-    return this.repository.find({
-      where: { codeInsee },
-      order: { section: 'ASC' },
-    });
+    return this.repository
+      .createQueryBuilder('data')
+      .where('data.idpar LIKE :prefix', { prefix: `${codeInsee}%` })
+      .orderBy('data.idpar', 'ASC')
+      .getMany();
   }
 }
