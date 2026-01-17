@@ -155,4 +155,8 @@ export class PropertyEstimateService {
     // Update only the estimated price
     return this.repo.updateEstimatedPrice(propertyId, newEstimatedPrice);
   }
+
+  async deleteEstimate(propertyId: string): Promise<boolean> {
+    return this.repo.delete(propertyId);
+  }
 }

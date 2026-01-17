@@ -36,6 +36,10 @@ export default function MyEstimatesPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; propertyId: string | null }>({
+    show: false,
+    propertyId: null,
+  });
 
   useEffect(() => {
     if (session && (session as any).backendToken) {
@@ -129,6 +133,49 @@ export default function MyEstimatesPage() {
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, propertyId: string) => {
+    e.stopPropagation(); // Prevent expand/collapse behavior
+    setDeleteConfirm({ show: true, propertyId });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.propertyId) return;
+
+    try {
+      const token = (session as any).backendToken;
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/${deleteConfirm.propertyId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete estimate');
+      }
+
+      // Remove from list
+      setEstimates(estimates.filter(e => e.propertyId !== deleteConfirm.propertyId));
+      
+      // Close selected estimate if it was deleted
+      if (selectedEstimate?.propertyId === deleteConfirm.propertyId) {
+        setSelectedEstimate(null);
+      }
+      
+      setDeleteConfirm({ show: false, propertyId: null });
+    } catch (error) {
+      console.error('Error deleting estimate:', error);
+      alert('Failed to delete estimate. Please try again.');
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ show: false, propertyId: null });
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -203,8 +250,17 @@ export default function MyEstimatesPage() {
                     </div>
                     <div className={styles.estimatePrice}>{formatPrice(estimate.estimatedPrice)}</div>
                   </div>
-                  <div className={styles.expandIcon}>
-                    {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
+                  <div className={styles.estimateActions}>
+                    <button
+                      className={styles.deleteButton}
+                      onClick={(e) => handleDeleteClick(e, estimate.propertyId)}
+                      title="Delete estimate"
+                    >
+                      🗑️
+                    </button>
+                    <div className={styles.expandIcon}>
+                      {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
+                    </div>
                   </div>
                 </div>
 
@@ -226,6 +282,26 @@ export default function MyEstimatesPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm.show && (
+        <div className={styles.modalOverlay} onClick={handleDeleteCancel}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Confirm Delete</h3>
+            <p className={styles.modalMessage}>
+              Are you sure you want to delete this estimate? This action cannot be undone.
+            </p>
+            <div className={styles.modalButtons}>
+              <button className={styles.cancelButton} onClick={handleDeleteCancel}>
+                No
+              </button>
+              <button className={styles.confirmButton} onClick={handleDeleteConfirm}>
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
