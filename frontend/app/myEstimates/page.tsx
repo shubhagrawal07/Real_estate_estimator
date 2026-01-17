@@ -36,6 +36,10 @@ export default function MyEstimatesPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; propertyId: string | null }>({
+    show: false,
+    propertyId: null,
+  });
 
   useEffect(() => {
     if (session && (session as any).backendToken) {
@@ -92,7 +96,12 @@ export default function MyEstimatesPage() {
   };
 
   const handleEstimateClick = (estimate: PropertyEstimate) => {
-    fetchEstimate(estimate.propertyId);
+    // If clicking the same estimate, collapse it
+    if (selectedEstimate?.propertyId === estimate.propertyId) {
+      setSelectedEstimate(null);
+    } else {
+      fetchEstimate(estimate.propertyId);
+    }
   };
 
   const handleRecalculate = async () => {
@@ -122,6 +131,49 @@ export default function MyEstimatesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, propertyId: string) => {
+    e.stopPropagation(); // Prevent expand/collapse behavior
+    setDeleteConfirm({ show: true, propertyId });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.propertyId) return;
+
+    try {
+      const token = (session as any).backendToken;
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/${deleteConfirm.propertyId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete estimate');
+      }
+
+      // Remove from list
+      setEstimates(estimates.filter(e => e.propertyId !== deleteConfirm.propertyId));
+      
+      // Close selected estimate if it was deleted
+      if (selectedEstimate?.propertyId === deleteConfirm.propertyId) {
+        setSelectedEstimate(null);
+      }
+      
+      setDeleteConfirm({ show: false, propertyId: null });
+    } catch (error) {
+      console.error('Error deleting estimate:', error);
+      alert('Failed to delete estimate. Please try again.');
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ show: false, propertyId: null });
   };
 
   const formatDate = (dateString: string) => {
@@ -159,67 +211,97 @@ export default function MyEstimatesPage() {
       </div>
 
       <div className={styles.content}>
-        <div className={styles.listSection}>
-          <h2 className={styles.sectionTitle}>Your Estimates</h2>
-          {fetching ? (
-            <div className={styles.loading}>Loading estimates...</div>
-          ) : error ? (
-            <div className={styles.error}>{error}</div>
-          ) : estimates.length === 0 ? (
-            <div className={styles.empty}>
-              <p>No estimates found. Create your first estimate!</p>
-              <button 
-                className={styles.createButton}
-                onClick={() => router.push('/getEstimates')}
-              >
-                Get Estimate
-              </button>
-            </div>
-          ) : (
-            <div className={styles.estimatesList}>
-              {estimates.map((estimate) => (
+        {fetching ? (
+          <div className={styles.loading}>Loading estimates...</div>
+        ) : error ? (
+          <div className={styles.error}>{error}</div>
+        ) : estimates.length === 0 ? (
+          <div className={styles.empty}>
+            <p>No estimates found. Create your first estimate!</p>
+            <button 
+              className={styles.createButton}
+              onClick={() => router.push('/getEstimates')}
+            >
+              Get Estimate
+            </button>
+          </div>
+        ) : (
+          <div className={styles.estimatesList}>
+            {estimates.map((estimate) => (
+              <div key={estimate.propertyId} className={styles.estimateContainer}>
                 <div
-                  key={estimate.propertyId}
                   className={`${styles.estimateItem} ${
-                    selectedEstimate?.propertyId === estimate.propertyId ? styles.selected : ''
+                    selectedEstimate?.propertyId === estimate.propertyId ? styles.expanded : ''
                   }`}
                   onClick={() => handleEstimateClick(estimate)}
                 >
-                  <div className={styles.estimateHeader}>
-                    <span className={styles.status}>{estimate.status}</span>
-                    <span className={styles.date}>{formatDate(estimate.createdDate)}</span>
+                  <div className={styles.estimateSummary}>
+                    <div className={styles.estimateHeader}>
+                      <span className={styles.status}>{estimate.status}</span>
+                      <span className={styles.date}>{formatDate(estimate.createdDate)}</span>
+                    </div>
+                    <div className={styles.estimateAddress}>{estimate.address}</div>
+                    <div className={styles.estimateDetails}>
+                      <span>{estimate.type}</span>
+                      <span>•</span>
+                      <span>{estimate.area} m²</span>
+                      <span>•</span>
+                      <span>{estimate.bedrooms} bed</span>
+                    </div>
+                    <div className={styles.estimatePrice}>{formatPrice(estimate.estimatedPrice)}</div>
                   </div>
-                  <div className={styles.estimateAddress}>{estimate.address}</div>
-                  <div className={styles.estimateDetails}>
-                    <span>{estimate.type}</span>
-                    <span>•</span>
-                    <span>{estimate.area} m²</span>
-                    <span>•</span>
-                    <span>{estimate.bedrooms} bed</span>
+                  <div className={styles.estimateActions}>
+                    <button
+                      className={styles.deleteButton}
+                      onClick={(e) => handleDeleteClick(e, estimate.propertyId)}
+                      title="Delete estimate"
+                    >
+                      🗑️
+                    </button>
+                    <div className={styles.expandIcon}>
+                      {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
+                    </div>
                   </div>
-                  <div className={styles.estimatePrice}>{formatPrice(estimate.estimatedPrice)}</div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div className={styles.detailSection}>
-          {loading && !selectedEstimate ? (
-            <div className={styles.loading}>Loading estimate...</div>
-          ) : selectedEstimate ? (
-            <EstimateDisplay
-              estimate={selectedEstimate}
-              onRecalculate={handleRecalculate}
-              loading={loading}
-            />
-          ) : (
-            <div className={styles.noSelection}>
-              <p>Select an estimate from the list to view details</p>
-            </div>
-          )}
-        </div>
+                {selectedEstimate?.propertyId === estimate.propertyId && (
+                  <div className={styles.estimateDetailExpanded}>
+                    {loading ? (
+                      <div className={styles.loading}>Loading details...</div>
+                    ) : (
+                      <EstimateDisplay
+                        estimate={selectedEstimate}
+                        onRecalculate={handleRecalculate}
+                        loading={loading}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm.show && (
+        <div className={styles.modalOverlay} onClick={handleDeleteCancel}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Confirm Delete</h3>
+            <p className={styles.modalMessage}>
+              Are you sure you want to delete this estimate? This action cannot be undone.
+            </p>
+            <div className={styles.modalButtons}>
+              <button className={styles.cancelButton} onClick={handleDeleteCancel}>
+                No
+              </button>
+              <button className={styles.confirmButton} onClick={handleDeleteConfirm}>
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

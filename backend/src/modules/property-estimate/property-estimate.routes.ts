@@ -117,4 +117,36 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.delete('/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
+
+    // First, verify the estimate belongs to the authenticated user
+    const estimate = await propertyEstimateService.findOne(id);
+    if (!estimate) {
+      return res.status(404).json({ message: 'Estimate not found' });
+    }
+
+    // Check if the user owns this estimate
+    if (estimate.userId !== req.userId) {
+      return res.status(403).json({ message: 'You do not have permission to delete this estimate' });
+    }
+
+    const deleted = await propertyEstimateService.deleteEstimate(id);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Estimate not found' });
+    }
+
+    res.json({ message: 'Estimate deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Failed to delete estimate',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

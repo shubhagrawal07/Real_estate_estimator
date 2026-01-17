@@ -1,8 +1,11 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 
 export default function Home() {
+  const router = useRouter();
+
   return (
     <div className={styles.container}>
       <div className={styles.welcomeSection}>
@@ -10,6 +13,12 @@ export default function Home() {
         <p className={styles.welcomeSubtitle}>
           Your trusted partner for accurate property valuations
         </p>
+        <button 
+          className={styles.getEstimateButton}
+          onClick={() => router.push('/getEstimates')}
+        >
+          Get Your Property Estimate
+        </button>
       </div>
 
       <div className={styles.content}>

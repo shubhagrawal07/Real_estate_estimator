@@ -78,4 +78,9 @@ export class PropertyEstimateRepo {
     estimate.estimatedPrice = estimatedPrice;
     return this.repository.save(estimate);
   }
+
+  async delete(propertyId: string): Promise<boolean> {
+    const result = await this.repository.delete({ propertyId });
+    return result.affected !== null && result.affected > 0;
+  }
 }

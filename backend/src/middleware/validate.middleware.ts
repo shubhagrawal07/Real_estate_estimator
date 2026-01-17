@@ -1,5 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { PropertyType, OwnershipType, Deadline } from '../modules/property-estimate/property-estimate.model';
+import {
+  PropertyType,
+  OwnershipType,
+  Deadline,
+  BuildingAge,
+} from '../modules/property-estimate/property-estimate.model';
+import { OutdoorSpace } from '../modules/property-estimate/entities/apartment-details.model';
+import { PoolOption } from '../modules/property-estimate/entities/house-details.model';
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -7,6 +14,7 @@ export interface CreatePropertyEstimateDto {
   department: string;
   municipality: string;
   cadastralSection: string;
+  buildingAge: BuildingAge;
   type: PropertyType;
   area: number;
   bedrooms: number;
@@ -14,6 +22,28 @@ export interface CreatePropertyEstimateDto {
   floors: number;
   hasBalcony: boolean;
   hasParking: boolean;
+  doubleLivingRoom?: boolean;
+  openKitchen?: boolean;
+  laundryCellar?: boolean;
+  apartmentElevator?: boolean | null;
+  apartmentFloor?: number | null;
+  outdoorSpace?: OutdoorSpace;
+  landSize?: number | null;
+  semiDetached?: boolean | null;
+  poolOption?: PoolOption;
+  criteriaCalm?: boolean;
+  criteriaBright?: boolean;
+  criteriaNearAmenities?: boolean;
+  criteriaNoVisAvis?: boolean;
+  criteriaWellConnected?: boolean;
+  amenityAirConditioning?: boolean;
+  amenityModernBathroom?: boolean;
+  amenityRecentKitchen?: boolean;
+  amenityFireplace?: boolean;
+  parkingGarage?: boolean;
+  parkingPrivate?: boolean;
+  parkingShared?: boolean;
+  parkingStreet?: boolean;
   ownershipType: OwnershipType;
   deadline: Deadline;
   condition?: string;
@@ -71,16 +101,16 @@ export function validatePropertyEstimate(
     errors.push('Area is required and must be a number greater than 0');
   }
 
-  if (typeof bedrooms !== 'number' || bedrooms < 1) {
-    errors.push('Bedrooms is required and must be a number greater than or equal to 1');
+  if (typeof bedrooms !== 'number' || bedrooms < 0) {
+    errors.push('Bedrooms is required and must be a number greater than or equal to 0');
   }
 
   if (typeof bathrooms !== 'number' || bathrooms < 1) {
     errors.push('Bathrooms is required and must be a number greater than or equal to 1');
   }
 
-  if (typeof floors !== 'number' || floors < 1) {
-    errors.push('Floors is required and must be a number greater than or equal to 1');
+  if (typeof floors !== 'number' || floors < 0) {
+    errors.push('Floors is required and must be a number greater than or equal to 0');
   }
 
   if (typeof hasBalcony !== 'boolean') {

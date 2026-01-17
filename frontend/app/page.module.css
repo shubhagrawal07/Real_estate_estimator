@@ -26,6 +26,29 @@
   font-size: 1.25rem;
   color: #666;
   font-weight: 400;
+  margin-bottom: 2rem;
+}
+
+.getEstimateButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2.5rem;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.getEstimateButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.getEstimateButton:active {
+  transform: translateY(0);
 }
 
 .content {
@@ -67,6 +90,11 @@
   }
 
   .welcomeSubtitle {
+    font-size: 1rem;
+  }
+
+  .getEstimateButton {
+    padding: 0.875rem 2rem;
     font-size: 1rem;
   }
 
