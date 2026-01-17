@@ -1,78 +1,104 @@
-.main {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 2rem;
 }
 
-.container {
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  max-width: 900px;
-  width: 100%;
-  padding: 3rem;
-  animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.header {
+.welcomeSection {
   text-align: center;
   margin-bottom: 3rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 16px;
 }
 
-.title {
+.welcomeTitle {
   font-size: 2.5rem;
   font-weight: 700;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-.subtitle {
-  font-size: 1.1rem;
+.welcomeSubtitle {
+  font-size: 1.25rem;
   color: #666;
   font-weight: 400;
+  margin-bottom: 2rem;
+}
+
+.getEstimateButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2.5rem;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.getEstimateButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.getEstimateButton:active {
+  transform: translateY(0);
 }
 
 .content {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 2rem;
 }
 
-.error {
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 8px;
-  padding: 1rem;
-  color: #c33;
-  text-align: center;
+.infoCard {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.infoCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.cardTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1rem;
+  color: #667eea;
+}
+
+.cardText {
+  font-size: 1rem;
+  color: #666;
+  line-height: 1.6;
 }
 
 @media (max-width: 768px) {
-  .container {
-    padding: 2rem 1.5rem;
-  }
-
-  .title {
+  .welcomeTitle {
     font-size: 2rem;
   }
 
-  .subtitle {
+  .welcomeSubtitle {
     font-size: 1rem;
+  }
+
+  .getEstimateButton {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+
+  .content {
+    grid-template-columns: 1fr;
   }
 }

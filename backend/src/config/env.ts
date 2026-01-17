@@ -13,4 +13,11 @@ export const config = {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'real_estate_db',
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+  },
 };

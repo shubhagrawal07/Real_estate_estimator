@@ -1,23 +1,5 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
-import {
-  PropertyEstimate,
-  PropertyType,
-  OwnershipType,
-  Deadline,
-  PropertyStatus,
-  BuildingAge,
-} from './property-estimate.model';
-import { AppDataSource } from '../../config/db';
-import { ApartmentDetails, OutdoorSpace } from './entities/apartment-details.model';
-import { HouseDetails, PoolOption } from './entities/house-details.model';
-import { Criteria } from './entities/criteria.model';
-import { Amenity } from './entities/amenity.model';
-import { ParkingType } from './entities/parking-type.model';
-import { Feature } from './entities/feature.model';
-import { PropertyCriteria } from './entities/property-criteria.model';
-import { PropertyAmenity } from './entities/property-amenity.model';
-import { PropertyParking } from './entities/property-parking.model';
-import { PropertyFeature } from './entities/property-feature.model';
+import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus } from './property-estimate.model';
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -25,7 +7,6 @@ export interface CreatePropertyEstimateDto {
   department: string;
   municipality: string;
   cadastralSection: string;
-  buildingAge: BuildingAge;
   type: PropertyType;
   area: number;
   bedrooms: number;
@@ -33,28 +14,6 @@ export interface CreatePropertyEstimateDto {
   floors: number;
   hasBalcony: boolean;
   hasParking: boolean;
-  doubleLivingRoom: boolean;
-  openKitchen: boolean;
-  laundryCellar: boolean;
-  apartmentElevator?: boolean | null;
-  apartmentFloor?: number | null;
-  outdoorSpace: OutdoorSpace;
-  landSize?: number | null;
-  semiDetached?: boolean | null;
-  poolOption: PoolOption;
-  criteriaCalm: boolean;
-  criteriaBright: boolean;
-  criteriaNearAmenities: boolean;
-  criteriaNoVisAvis: boolean;
-  criteriaWellConnected: boolean;
-  amenityAirConditioning: boolean;
-  amenityModernBathroom: boolean;
-  amenityRecentKitchen: boolean;
-  amenityFireplace: boolean;
-  parkingGarage: boolean;
-  parkingPrivate: boolean;
-  parkingShared: boolean;
-  parkingStreet: boolean;
   ownershipType: OwnershipType;
   deadline: Deadline;
   condition?: string;
@@ -67,224 +26,19 @@ export class PropertyEstimateService {
     this.repo = new PropertyEstimateRepo();
   }
 
-  async createEstimate(dto: CreatePropertyEstimateDto): Promise<PropertyEstimate> {
-    // Get repositories for junction tables
-    const criteriaRepo = AppDataSource.getRepository(Criteria);
-    const amenityRepo = AppDataSource.getRepository(Amenity);
-    const parkingTypeRepo = AppDataSource.getRepository(ParkingType);
-    const featureRepo = AppDataSource.getRepository(Feature);
-    const propertyCriteriaRepo = AppDataSource.getRepository(PropertyCriteria);
-    const propertyAmenityRepo = AppDataSource.getRepository(PropertyAmenity);
-    const propertyParkingRepo = AppDataSource.getRepository(PropertyParking);
-    const propertyFeatureRepo = AppDataSource.getRepository(PropertyFeature);
+  async createEstimate(dto: CreatePropertyEstimateDto, userId?: string): Promise<PropertyEstimate> {
+    const estimatedPrice = this.calculatePrice(dto);
 
-    // Calculate price including normalized data impact
-    const estimatedPrice = await this.calculatePriceWithRelations(dto, criteriaRepo, amenityRepo, parkingTypeRepo, featureRepo);
-
-    // Create property estimate without the boolean fields
-    const { 
-      criteriaCalm, criteriaBright, criteriaNearAmenities, criteriaNoVisAvis, criteriaWellConnected,
-      amenityAirConditioning, amenityModernBathroom, amenityRecentKitchen, amenityFireplace,
-      parkingGarage, parkingPrivate, parkingShared, parkingStreet,
-      doubleLivingRoom, openKitchen, laundryCellar,
-      ...propertyData 
-    } = dto;
-
-    const property = await this.repo.create({
-      ...propertyData,
+    return this.repo.create({
+      ...dto,
       estimatedPrice,
       impressions: 0,
-      status: PropertyStatus.NEW,
+      status: userId ? PropertyStatus.NEW : PropertyStatus.DRAFT,
+      userId: userId || undefined,
     });
-
-    // Create type-specific details based on property type
-    if (dto.type === PropertyType.APARTMENT) {
-      const apartmentDetailsRepo = AppDataSource.getRepository(ApartmentDetails);
-      await apartmentDetailsRepo.save({
-        propertyId: property.propertyId,
-        hasElevator: dto.apartmentElevator ?? false,
-        floorNumber: dto.apartmentFloor ?? 0,
-        outdoorSpace: dto.outdoorSpace ?? OutdoorSpace.NONE,
-      });
-    } else if (dto.type === PropertyType.HOUSE) {
-      const houseDetailsRepo = AppDataSource.getRepository(HouseDetails);
-      await houseDetailsRepo.save({
-        propertyId: property.propertyId,
-        landSize: dto.landSize ?? 100,
-        semiDetached: dto.semiDetached ?? false,
-        poolOption: dto.poolOption ?? PoolOption.NOT_POSSIBLE,
-      });
-    }
-
-    // Create relationships for criteria
-    const criteriaMap: { [key: string]: boolean } = {
-      calm: criteriaCalm,
-      bright: criteriaBright,
-      near_amenities: criteriaNearAmenities,
-      no_vis_a_vis: criteriaNoVisAvis,
-      well_connected: criteriaWellConnected,
-    };
-
-    for (const [code, isSelected] of Object.entries(criteriaMap)) {
-      if (isSelected) {
-        const criteria = await criteriaRepo.findOne({ where: { code } });
-        if (criteria) {
-          await propertyCriteriaRepo.save({
-            propertyId: property.propertyId,
-            criteriaId: criteria.id,
-          });
-        }
-      }
-    }
-
-    // Create relationships for amenities
-    const amenityMap: { [key: string]: boolean } = {
-      air_conditioning: amenityAirConditioning,
-      modern_bathroom: amenityModernBathroom,
-      recent_kitchen: amenityRecentKitchen,
-      fireplace: amenityFireplace,
-    };
-
-    for (const [code, isSelected] of Object.entries(amenityMap)) {
-      if (isSelected) {
-        const amenity = await amenityRepo.findOne({ where: { code } });
-        if (amenity) {
-          await propertyAmenityRepo.save({
-            propertyId: property.propertyId,
-            amenityId: amenity.id,
-          });
-        }
-      }
-    }
-
-    // Create relationships for parking
-    const parkingMap: { [key: string]: boolean } = {
-      garage: parkingGarage,
-      private: parkingPrivate,
-      shared: parkingShared,
-      street: parkingStreet,
-    };
-
-    for (const [code, isSelected] of Object.entries(parkingMap)) {
-      if (isSelected) {
-        const parkingType = await parkingTypeRepo.findOne({ where: { code } });
-        if (parkingType) {
-          await propertyParkingRepo.save({
-            propertyId: property.propertyId,
-            parkingTypeId: parkingType.id,
-          });
-        }
-      }
-    }
-
-    // Create relationships for features (quick features)
-    const featureMap: { [key: string]: boolean } = {
-      double_living_room: doubleLivingRoom,
-      open_kitchen: openKitchen,
-      laundry_cellar: laundryCellar,
-    };
-
-    for (const [code, isSelected] of Object.entries(featureMap)) {
-      if (isSelected) {
-        const feature = await featureRepo.findOne({ where: { code } });
-        if (feature) {
-          await propertyFeatureRepo.save({
-            propertyId: property.propertyId,
-            featureId: feature.id,
-          });
-        }
-      }
-    }
-
-    return property;
   }
 
-  private async calculatePriceWithRelations(
-    dto: CreatePropertyEstimateDto,
-    criteriaRepo: any,
-    amenityRepo: any,
-    parkingTypeRepo: any,
-    featureRepo: any
-  ): Promise<number> {
-    let basePrice = this.calculateBasePrice(dto);
-
-    // Add criteria impacts
-    const criteriaMap: { [key: string]: boolean } = {
-      calm: dto.criteriaCalm,
-      bright: dto.criteriaBright,
-      near_amenities: dto.criteriaNearAmenities,
-      no_vis_a_vis: dto.criteriaNoVisAvis,
-      well_connected: dto.criteriaWellConnected,
-    };
-
-    for (const [code, isSelected] of Object.entries(criteriaMap)) {
-      if (isSelected) {
-        const criteria = await criteriaRepo.findOne({ where: { code } });
-        if (criteria) {
-          basePrice *= (1 + criteria.priceImpact / 100);
-        }
-      }
-    }
-
-    // Add amenity impacts
-    const amenityMap: { [key: string]: boolean } = {
-      air_conditioning: dto.amenityAirConditioning,
-      modern_bathroom: dto.amenityModernBathroom,
-      recent_kitchen: dto.amenityRecentKitchen,
-      fireplace: dto.amenityFireplace,
-    };
-
-    for (const [code, isSelected] of Object.entries(amenityMap)) {
-      if (isSelected) {
-        const amenity = await amenityRepo.findOne({ where: { code } });
-        if (amenity) {
-          basePrice *= (1 + amenity.priceImpact / 100);
-        }
-      }
-    }
-
-    // Add parking impacts (take the highest one, not cumulative)
-    const parkingMap: { [key: string]: boolean } = {
-      garage: dto.parkingGarage,
-      private: dto.parkingPrivate,
-      shared: dto.parkingShared,
-      street: dto.parkingStreet,
-    };
-
-    let highestParkingImpact = 0;
-    for (const [code, isSelected] of Object.entries(parkingMap)) {
-      if (isSelected) {
-        const parkingType = await parkingTypeRepo.findOne({ where: { code } });
-        if (parkingType && parkingType.priceImpact > highestParkingImpact) {
-          highestParkingImpact = parkingType.priceImpact;
-        }
-      }
-    }
-
-    if (highestParkingImpact > 0) {
-      basePrice *= (1 + highestParkingImpact / 100);
-    }
-
-    // Add feature impacts
-    const featureMap: { [key: string]: boolean } = {
-      double_living_room: dto.doubleLivingRoom,
-      open_kitchen: dto.openKitchen,
-      laundry_cellar: dto.laundryCellar,
-    };
-
-    for (const [code, isSelected] of Object.entries(featureMap)) {
-      if (isSelected) {
-        const feature = await featureRepo.findOne({ where: { code } });
-        if (feature) {
-          basePrice *= (1 + feature.priceImpact / 100);
-        }
-      }
-    }
-
-    return Math.round(basePrice);
-  }
-
-  private calculateBasePrice(dto: CreatePropertyEstimateDto): number {
+  private calculatePrice(dto: CreatePropertyEstimateDto): number {
     let basePricePerSqM = 2000; // Base price per square meter
 
     // Department/municipality multiplier (location-based pricing)
@@ -368,6 +122,37 @@ export class PropertyEstimateService {
   }
 
   async findOne(id: string): Promise<PropertyEstimate | null> {
-    return this.repo.findOneWithRelations(id);
+    return this.repo.findOne(id);
+  }
+
+  async recalculateEstimate(propertyId: string): Promise<PropertyEstimate | null> {
+    const estimate = await this.repo.findOne(propertyId);
+    if (!estimate) {
+      return null;
+    }
+
+    // Convert estimate to DTO format for price calculation
+    const dto: CreatePropertyEstimateDto = {
+      address: estimate.address,
+      postalCode: estimate.postalCode,
+      department: estimate.department,
+      municipality: estimate.municipality,
+      cadastralSection: estimate.cadastralSection,
+      type: estimate.type,
+      area: estimate.area,
+      bedrooms: estimate.bedrooms,
+      bathrooms: estimate.bathrooms,
+      floors: estimate.floors,
+      hasBalcony: estimate.hasBalcony,
+      hasParking: estimate.hasParking,
+      ownershipType: estimate.ownershipType,
+      deadline: estimate.deadline,
+      condition: estimate.condition,
+    };
+
+    const newEstimatedPrice = this.calculatePrice(dto);
+    
+    // Update only the estimated price
+    return this.repo.updateEstimatedPrice(propertyId, newEstimatedPrice);
   }
 }

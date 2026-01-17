@@ -1,70 +1,54 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import PropertyEstimateForm from '@/components/PropertyEstimateForm';
 import styles from './page.module.css';
 
 export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleEstimate = async (propertyData: any) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('http://localhost:3001/property-estimate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(propertyData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || 
-          `Server error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      sessionStorage.setItem('latestEstimate', JSON.stringify(data));
-      router.push('/estimate');
-    } catch (err) {
-      if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Cannot connect to server. Please make sure the backend is running on http://localhost:3001');
-      } else {
-        setError(err instanceof Error ? err.message : 'An error occurred while getting the estimate');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <main className={styles.main}>
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>Real Estate Price Estimator</h1>
-          <p className={styles.subtitle}>
-            Get an instant estimate of your property's current market value
+    <div className={styles.container}>
+      <div className={styles.welcomeSection}>
+        <h1 className={styles.welcomeTitle}>Welcome to Real Estate Estimator</h1>
+        <p className={styles.welcomeSubtitle}>
+          Your trusted partner for accurate property valuations
+        </p>
+        <button 
+          className={styles.getEstimateButton}
+          onClick={() => router.push('/getEstimates')}
+        >
+          Get Your Property Estimate
+        </button>
+      </div>
+
+      <div className={styles.content}>
+        <div className={styles.infoCard}>
+          <h2 className={styles.cardTitle}>Why Real Estate Investment?</h2>
+          <p className={styles.cardText}>
+            Real estate investment has long been considered one of the most stable and profitable 
+            investment strategies. Unlike stocks and bonds, real estate provides tangible assets 
+            that typically appreciate over time while generating rental income.
           </p>
         </div>
 
-        <div className={styles.content}>
-          <PropertyEstimateForm onSubmit={handleEstimate} loading={loading} />
-          
-          {error && (
-            <div className={styles.error}>
-              <p>Error: {error}</p>
-            </div>
-          )}
+        <div className={styles.infoCard}>
+          <h2 className={styles.cardTitle}>Market Trends</h2>
+          <p className={styles.cardText}>
+            The real estate market continues to show strong growth potential. Property values 
+            have historically increased at an average rate of 3-5% annually, making real estate 
+            a reliable long-term investment option.
+          </p>
+        </div>
+
+        <div className={styles.infoCard}>
+          <h2 className={styles.cardTitle}>Get Started</h2>
+          <p className={styles.cardText}>
+            Use our advanced estimation tool to get an accurate valuation of any property. 
+            Our algorithm analyzes multiple factors including location, size, condition, and 
+            market trends to provide you with the most reliable estimate.
+          </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
