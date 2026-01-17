@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import styles from './PropertyEstimateForm.module.css';
 
 export enum PropertyType {
@@ -18,33 +19,74 @@ export enum Deadline {
   NOT_IMMEDIATE = 'not immediate',
 }
 
+type BuildingAge = 'recent' | 'old';
+type OutdoorSpace = 'none' | 'lt10' | 'gte10';
+type PoolOption = 'pool' | 'possible' | 'not_possible';
+type ConditionValue = 'excellent' | 'good' | 'needs renovation';
+
 interface PropertyData {
-  // Step 1: Address and Postcode
+  // Legacy required fields (kept for backend validation)
   address: string;
   postalCode: number;
-  
-  // Step 2: Location Data
   department: string;
   municipality: string;
   cadastralSection: string;
-  
-  // Step 3: Features Data
+
+  // Page 1
   type: PropertyType;
+  buildingAge: BuildingAge;
+  condition: ConditionValue;
+
+  // Page 2
   area: number;
   bedrooms: number;
   bathrooms: number;
   floors: number;
+  doubleLivingRoom: boolean;
+  openKitchen: boolean;
+  laundryCellar: boolean;
+
+  apartmentElevator: boolean | null;
+  apartmentFloor: number | null;
+  outdoorSpace: OutdoorSpace;
+
+  landSize: number | null;
+  semiDetached: boolean | null;
+  poolOption: PoolOption;
+
+  // Page 3
+  criteriaCalm: boolean;
+  criteriaBright: boolean;
+  criteriaNearAmenities: boolean;
+  criteriaNoVisAvis: boolean;
+  criteriaWellConnected: boolean;
+
+  amenityAirConditioning: boolean;
+  amenityModernBathroom: boolean;
+  amenityRecentKitchen: boolean;
+  amenityFireplace: boolean;
+
+  parkingGarage: boolean;
+  parkingPrivate: boolean;
+  parkingShared: boolean;
+  parkingStreet: boolean;
+
+  // Backend fields
   hasBalcony: boolean;
   hasParking: boolean;
   ownershipType: OwnershipType;
   deadline: Deadline;
-  condition?: string;
 }
 
 interface PropertyEstimateFormProps {
   onSubmit: (data: PropertyData) => void;
   loading: boolean;
 }
+
+const MIN_AREA = 20;
+const MAX_AREA = 300;
+const MIN_LAND_SIZE = 50;
+const MAX_LAND_SIZE = 1200;
 
 export default function PropertyEstimateForm({
   onSubmit,
@@ -54,116 +96,282 @@ export default function PropertyEstimateForm({
   const [formData, setFormData] = useState<PropertyData>({
     address: '',
     postalCode: 0,
-    department: '',
-    municipality: '',
-    cadastralSection: '',
+    department: 'Unknown',
+    municipality: 'Unknown',
+    cadastralSection: 'Unknown',
     type: PropertyType.APARTMENT,
-    area: 0,
+    buildingAge: 'recent',
+    condition: 'excellent',
+    area: 70,
     bedrooms: 1,
     bathrooms: 1,
     floors: 1,
+    doubleLivingRoom: false,
+    openKitchen: false,
+    laundryCellar: false,
+    apartmentElevator: false,
+    apartmentFloor: 1,
+    outdoorSpace: 'none',
+    landSize: 200,
+    semiDetached: false,
+    poolOption: 'not_possible',
+    criteriaCalm: false,
+    criteriaBright: false,
+    criteriaNearAmenities: false,
+    criteriaNoVisAvis: false,
+    criteriaWellConnected: false,
+    amenityAirConditioning: false,
+    amenityModernBathroom: false,
+    amenityRecentKitchen: false,
+    amenityFireplace: false,
+    parkingGarage: false,
+    parkingPrivate: false,
+    parkingShared: false,
+    parkingStreet: false,
     hasBalcony: false,
     hasParking: false,
     ownershipType: OwnershipType.OWNER,
     deadline: Deadline.NOT_IMMEDIATE,
-    condition: '',
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
-    
+  const setField = <K extends keyof PropertyData>(key: K, value: PropertyData[K]) => {
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === 'checkbox'
-          ? checked
-          : type === 'number'
-          ? value === '' ? 0 : Number(value)
-          : value,
+      [key]: value,
     }));
   };
 
-  const handleNext = () => {
+  type ToggleKey =
+    | 'doubleLivingRoom'
+    | 'openKitchen'
+    | 'laundryCellar'
+    | 'criteriaCalm'
+    | 'criteriaBright'
+    | 'criteriaNearAmenities'
+    | 'criteriaNoVisAvis'
+    | 'criteriaWellConnected'
+    | 'amenityAirConditioning'
+    | 'amenityModernBathroom'
+    | 'amenityRecentKitchen'
+    | 'amenityFireplace'
+    | 'parkingGarage'
+    | 'parkingPrivate'
+    | 'parkingShared'
+    | 'parkingStreet';
+
+  const toggleField = (key: ToggleKey) => {
+    setFormData((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const isApartment = formData.type === PropertyType.APARTMENT;
+  const stepLabels = ['Property basics', 'Size & layout', 'Quality & comfort'];
+  const progressPercent = (currentStep / 3) * 100;
+
+  const handleNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('Next clicked, currentStep:', currentStep);
+    
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 4));
+      const nextStep = Math.min(currentStep + 1, 3);
+      console.log('Moving to step:', nextStep);
+      setCurrentStep(nextStep);
+    } else {
+      console.log('Validation failed for step:', currentStep);
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
   const validateStep = (step: number): boolean => {
-    switch (step) {
-      case 1:
-        return formData.address.trim() !== '' && formData.postalCode > 0;
-      case 2:
-        return (
-          formData.department.trim() !== '' &&
-          formData.municipality.trim() !== '' &&
-          formData.cadastralSection.trim() !== ''
-        );
-      case 3:
-        return (
-          formData.area > 0 &&
-          formData.bedrooms >= 1 &&
-          formData.bathrooms >= 1 &&
-          formData.floors >= 1
-        );
-      default:
-        return true;
+    if (step === 1) {
+      return Boolean(
+        formData.address && 
+        formData.address.trim().length > 0 &&
+        formData.postalCode >= 1000 &&
+        formData.postalCode <= 99999 &&
+        formData.type && 
+        formData.buildingAge && 
+        formData.condition
+      );
     }
+    if (step === 2) {
+      if (formData.area < MIN_AREA || formData.bedrooms < 0) {
+        return false;
+      }
+      if (isApartment) {
+        return (
+          formData.apartmentElevator !== null &&
+          formData.apartmentFloor !== null &&
+          Boolean(formData.outdoorSpace)
+        );
+      }
+      return (
+        formData.landSize >= MIN_LAND_SIZE &&
+        formData.semiDetached !== null &&
+        Boolean(formData.poolOption)
+      );
+    }
+    return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateStep(3)) {
-      // Only include condition if it has a value
-      const submitData = { ...formData };
-      if (!submitData.condition || submitData.condition.trim() === '') {
-        delete submitData.condition;
-      }
-      onSubmit(submitData);
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    console.log('Form submit triggered, currentStep:', currentStep);
+    
+    if (currentStep < 3 || !validateStep(3)) {
+      console.log('Form submission blocked - not on step 3 or validation failed');
+      return;
     }
+    
+    console.log('Submitting form...');
+
+    const hasParking =
+      formData.parkingGarage ||
+      formData.parkingPrivate ||
+      formData.parkingShared ||
+      formData.parkingStreet;
+
+    const hasBalcony = isApartment && formData.outdoorSpace !== 'none';
+    const floors = isApartment && formData.apartmentFloor !== null ? formData.apartmentFloor : 1;
+
+    const payload: PropertyData = {
+      ...formData,
+      hasBalcony,
+      hasParking,
+      floors,
+      landSize: isApartment ? null : formData.landSize,
+      apartmentElevator: isApartment ? formData.apartmentElevator : null,
+      apartmentFloor: isApartment ? formData.apartmentFloor : null,
+      outdoorSpace: isApartment ? formData.outdoorSpace : 'none',
+      semiDetached: isApartment ? null : formData.semiDetached,
+      poolOption: isApartment ? 'not_possible' : formData.poolOption,
+    };
+
+    onSubmit(payload);
   };
 
   const renderStep1 = () => (
     <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>Address Information</h2>
-      <p className={styles.stepDescription}>
-        Please provide the property address and postal code
-      </p>
-      
-      <div className={styles.formGrid}>
-        <div className={styles.formGroup}>
-          <label htmlFor="address">Street Address *</label>
+      <h2 className={styles.stepTitle}>Property basics</h2>
+      <p className={styles.stepDescription}>Start with your property address.</p>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Property address & postal code</span>
+        <div className={styles.addressRow}>
           <input
             type="text"
-            id="address"
-            name="address"
             value={formData.address}
-            onChange={handleChange}
-            required
-            placeholder="123 Main Street"
+            onChange={(e) => setField('address', e.target.value)}
+            placeholder="Address (e.g., 123 Rue de la Paix)"
+            className={styles.addressInput}
+            autoComplete="street-address"
           />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="postalCode">Postal Code *</label>
           <input
             type="number"
-            id="postalCode"
-            name="postalCode"
             value={formData.postalCode || ''}
-            onChange={handleChange}
-            required
+            onChange={(e) => setField('postalCode', e.target.value ? Number(e.target.value) : 0)}
+            placeholder="Postal code"
+            className={styles.postalInput}
+            autoComplete="postal-code"
             min="1000"
             max="99999"
-            placeholder="75001"
           />
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Property type</span>
+        <div className={styles.optionGrid}>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.type === PropertyType.APARTMENT ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('type', PropertyType.APARTMENT)}
+          >
+            <span className={styles.buttonIcon}>🏢</span>
+            <span>Apartment</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.type === PropertyType.HOUSE ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('type', PropertyType.HOUSE)}
+          >
+            <span className={styles.buttonIcon}>🏡</span>
+            <span>House</span>
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Building age</span>
+        <div className={styles.optionGrid}>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.buildingAge === 'recent' ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('buildingAge', 'recent')}
+          >
+            <span className={styles.buttonIcon}>🆕</span>
+            <span>Recent (after 2010)</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.buildingAge === 'old' ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('buildingAge', 'old')}
+          >
+            <span className={styles.buttonIcon}>🏛️</span>
+            <span>Old (before 2010)</span>
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>General condition</span>
+        <div className={styles.optionGrid}>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.condition === 'excellent' ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('condition', 'excellent')}
+          >
+            <span className={styles.buttonIcon}>✨</span>
+            <span>Fully renovated</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.condition === 'good' ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('condition', 'good')}
+          >
+            <span className={styles.buttonIcon}>🏠</span>
+            <span>Minor works needed</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionButton} ${
+              formData.condition === 'needs renovation' ? styles.optionSelected : ''
+            }`}
+            onClick={() => setField('condition', 'needs renovation')}
+          >
+            <span className={styles.buttonIcon}>🔨</span>
+            <span>Full renovation needed</span>
+          </button>
         </div>
       </div>
     </div>
@@ -171,199 +379,409 @@ export default function PropertyEstimateForm({
 
   const renderStep2 = () => (
     <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>Location Data</h2>
-      <p className={styles.stepDescription}>
-        Please provide the location details of the property
-      </p>
-      
-      <div className={styles.formGrid}>
-        <div className={styles.formGroup}>
-          <label htmlFor="department">Department *</label>
-          <input
-            type="text"
-            id="department"
-            name="department"
-            value={formData.department}
-            onChange={handleChange}
-            required
-            placeholder="Paris"
-          />
-        </div>
+      <h2 className={styles.stepTitle}>Size & layout</h2>
+      <p className={styles.stepDescription}>Slide or tap the buttons to adjust.</p>
 
-        <div className={styles.formGroup}>
-          <label htmlFor="municipality">Municipality *</label>
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Surface (m²)</span>
+        <div className={styles.sliderRow}>
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => setField('area', Math.max(MIN_AREA, formData.area - 1))}
+          >
+            -
+          </button>
           <input
-            type="text"
-            id="municipality"
-            name="municipality"
-            value={formData.municipality}
-            onChange={handleChange}
-            required
-            placeholder="Paris"
+            type="range"
+            min={MIN_AREA}
+            max={MAX_AREA}
+            value={formData.area}
+            onChange={(event) => setField('area', Number(event.target.value))}
+            className={styles.slider}
           />
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => setField('area', Math.min(MAX_AREA, formData.area + 1))}
+          >
+            +
+          </button>
         </div>
+        <div className={styles.valueBadge}>{formData.area} m²</div>
+      </div>
 
-        <div className={styles.formGroup}>
-          <label htmlFor="cadastralSection">Cadastral Section *</label>
-          <input
-            type="text"
-            id="cadastralSection"
-            name="cadastralSection"
-            value={formData.cadastralSection}
-            onChange={handleChange}
-            required
-            placeholder="Section A"
-          />
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Bedrooms</span>
+        <div className={styles.optionGrid}>
+          {[0, 1, 2, 3, 4].map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={`${styles.optionButton} ${
+                formData.bedrooms === value ? styles.optionSelected : ''
+              }`}
+              onClick={() => setField('bedrooms', value)}
+            >
+              <span className={styles.buttonIcon}>🛏️</span>
+              <span>{value === 4 ? '4+' : value}</span>
+            </button>
+          ))}
         </div>
       </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Quick features</span>
+        <div className={styles.chipGroup}>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.doubleLivingRoom ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('doubleLivingRoom')}
+          >
+            <span className={styles.chipIcon}>🛋️</span>
+            Double living room
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.openKitchen ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('openKitchen')}
+          >
+            <span className={styles.chipIcon}>🍳</span>
+            Open kitchen
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.laundryCellar ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('laundryCellar')}
+          >
+            <span className={styles.chipIcon}>🧺</span>
+            Laundry / cellar
+          </button>
+        </div>
+      </div>
+
+      {isApartment ? (
+        <>
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Elevator</span>
+            <div className={styles.optionGrid}>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.apartmentElevator === true ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('apartmentElevator', true)}
+              >
+                <span className={styles.buttonIcon}>✅</span>
+                <span>Yes</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.apartmentElevator === false ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('apartmentElevator', false)}
+              >
+                <span className={styles.buttonIcon}>❌</span>
+                <span>No</span>
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Floor</span>
+            <div className={styles.optionGrid}>
+              {[0, 1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`${styles.optionButton} ${
+                    formData.apartmentFloor === value ? styles.optionSelected : ''
+                  }`}
+                  onClick={() => setField('apartmentFloor', value)}
+                >
+                  <span className={styles.buttonIcon}>📶</span>
+                  <span>{value === 5 ? '5+' : value}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Outdoor space</span>
+            <div className={styles.optionGrid}>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.outdoorSpace === 'none' ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('outdoorSpace', 'none')}
+              >
+                <span className={styles.buttonIcon}>🚫</span>
+                <span>None</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.outdoorSpace === 'lt10' ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('outdoorSpace', 'lt10')}
+              >
+                <span className={styles.buttonIcon}>🪴</span>
+                <span>&lt; 10 m²</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.outdoorSpace === 'gte10' ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('outdoorSpace', 'gte10')}
+              >
+                <span className={styles.buttonIcon}>🌳</span>
+                <span>10 m²+</span>
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Land size (m²)</span>
+            <div className={styles.sliderRow}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => setField('landSize', Math.max(MIN_LAND_SIZE, formData.landSize - 10))}
+              >
+                -
+              </button>
+              <input
+                type="range"
+                min={MIN_LAND_SIZE}
+                max={MAX_LAND_SIZE}
+                value={formData.landSize}
+                onChange={(event) => setField('landSize', Number(event.target.value))}
+                className={styles.slider}
+              />
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => setField('landSize', Math.min(MAX_LAND_SIZE, formData.landSize + 10))}
+              >
+                +
+              </button>
+            </div>
+            <div className={styles.valueBadge}>{formData.landSize} m²</div>
+          </div>
+
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Semi-detached</span>
+            <div className={styles.optionGrid}>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.semiDetached === true ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('semiDetached', true)}
+              >
+                <span className={styles.buttonIcon}>🏘️</span>
+                <span>Yes</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.semiDetached === false ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('semiDetached', false)}
+              >
+                <span className={styles.buttonIcon}>🏡</span>
+                <span>No</span>
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Pool</span>
+            <div className={styles.optionGrid}>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.poolOption === 'pool' ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('poolOption', 'pool')}
+              >
+                <span className={styles.buttonIcon}>🏊</span>
+                <span>Pool</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.poolOption === 'possible' ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('poolOption', 'possible')}
+              >
+                <span className={styles.buttonIcon}>🚧</span>
+                <span>Pool possible</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.poolOption === 'not_possible' ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('poolOption', 'not_possible')}
+              >
+                <span className={styles.buttonIcon}>⛔</span>
+                <span>Not possible</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 
   const renderStep3 = () => (
     <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>Property Features</h2>
-      <p className={styles.stepDescription}>
-        Please provide details about the property features
-      </p>
-      
-      <div className={styles.formGrid}>
-        <div className={styles.formGroup}>
-          <label htmlFor="type">Property Type *</label>
-          <select
-            id="type"
-            name="type"
-            value={formData.type}
-            onChange={handleChange}
-            required
+      <h2 className={styles.stepTitle}>Quality & comfort</h2>
+      <p className={styles.stepDescription}>Tap to select the highlights.</p>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Key criteria</span>
+        <div className={styles.chipGroup}>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.criteriaCalm ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('criteriaCalm')}
           >
-            <option value={PropertyType.APARTMENT}>Apartment</option>
-            <option value={PropertyType.HOUSE}>House</option>
-          </select>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="area">Area (m²) *</label>
-          <input
-            type="number"
-            id="area"
-            name="area"
-            value={formData.area || ''}
-            onChange={handleChange}
-            required
-            min="1"
-            placeholder="100"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="bedrooms">Bedrooms *</label>
-          <input
-            type="number"
-            id="bedrooms"
-            name="bedrooms"
-            value={formData.bedrooms || ''}
-            onChange={handleChange}
-            required
-            min="1"
-            placeholder="3"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="bathrooms">Bathrooms *</label>
-          <input
-            type="number"
-            id="bathrooms"
-            name="bathrooms"
-            value={formData.bathrooms || ''}
-            onChange={handleChange}
-            required
-            min="1"
-            placeholder="2"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="floors">Floors *</label>
-          <input
-            type="number"
-            id="floors"
-            name="floors"
-            value={formData.floors || ''}
-            onChange={handleChange}
-            required
-            min="1"
-            placeholder="1"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="condition">Condition (Optional)</label>
-          <select
-            id="condition"
-            name="condition"
-            value={formData.condition || ''}
-            onChange={handleChange}
+            <span className={styles.chipIcon}>🤫</span>
+            Calm
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.criteriaBright ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('criteriaBright')}
           >
-            <option value="">Select condition</option>
-            <option value="excellent">Excellent</option>
-            <option value="good">Good</option>
-            <option value="fair">Fair</option>
-            <option value="poor">Poor</option>
-            <option value="needs renovation">Needs Renovation</option>
-          </select>
-        </div>
-
-        <div className={styles.checkboxGroup}>
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              name="hasBalcony"
-              checked={formData.hasBalcony}
-              onChange={handleChange}
-            />
-            <span>Has Balcony</span>
-          </label>
-        </div>
-
-        <div className={styles.checkboxGroup}>
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              name="hasParking"
-              checked={formData.hasParking}
-              onChange={handleChange}
-            />
-            <span>Has Parking</span>
-          </label>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="ownershipType">Ownership Type *</label>
-          <select
-            id="ownershipType"
-            name="ownershipType"
-            value={formData.ownershipType}
-            onChange={handleChange}
-            required
+            <span className={styles.chipIcon}>☀️</span>
+            Bright
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.criteriaNearAmenities ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('criteriaNearAmenities')}
           >
-            <option value={OwnershipType.OWNER}>Owner</option>
-            <option value={OwnershipType.TENANT}>Tenant</option>
-          </select>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="deadline">Deadline *</label>
-          <select
-            id="deadline"
-            name="deadline"
-            value={formData.deadline}
-            onChange={handleChange}
-            required
+            <span className={styles.chipIcon}>🏪</span>
+            Near amenities
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.criteriaNoVisAvis ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('criteriaNoVisAvis')}
           >
-            <option value={Deadline.IMMEDIATE}>Immediate</option>
-            <option value={Deadline.NOT_IMMEDIATE}>Not Immediate</option>
-          </select>
+            <span className={styles.chipIcon}>🔒</span>
+            No vis-à-vis
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.criteriaWellConnected ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('criteriaWellConnected')}
+          >
+            <span className={styles.chipIcon}>🚇</span>
+            Well connected
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Amenities</span>
+        <div className={styles.chipGroup}>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.amenityAirConditioning ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('amenityAirConditioning')}
+          >
+            <span className={styles.chipIcon}>❄️</span>
+            Air conditioning
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.amenityModernBathroom ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('amenityModernBathroom')}
+          >
+            <span className={styles.chipIcon}>🛁</span>
+            Modern bathroom
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.amenityRecentKitchen ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('amenityRecentKitchen')}
+          >
+            <span className={styles.chipIcon}>🍽️</span>
+            Recent equipped kitchen
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.amenityFireplace ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('amenityFireplace')}
+          >
+            <span className={styles.chipIcon}>🔥</span>
+            Fireplace or stove
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Parking</span>
+        <div className={styles.chipGroup}>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.parkingGarage ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('parkingGarage')}
+          >
+            <span className={styles.chipIcon}>🚗</span>
+            Garage
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.parkingPrivate ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('parkingPrivate')}
+          >
+            <span className={styles.chipIcon}>🅿️</span>
+            Private parking spot
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.parkingShared ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('parkingShared')}
+          >
+            <span className={styles.chipIcon}>🚙</span>
+            Shared parking
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${formData.parkingStreet ? styles.chipSelected : ''}`}
+            onClick={() => toggleField('parkingStreet')}
+          >
+            <span className={styles.chipIcon}>🛣️</span>
+            Street parking
+          </button>
         </div>
       </div>
     </div>
@@ -371,78 +789,33 @@ export default function PropertyEstimateForm({
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
-      {/* Step Indicator */}
-      <div className={styles.stepIndicator}>
-        <div className={styles.stepIndicatorContainer}>
-          {[1, 2, 3, 4].map((step) => (
-            <div key={step} className={styles.stepIndicatorItem}>
-              <div
-                className={`${styles.stepCircle} ${
-                  currentStep >= step ? styles.active : ''
-                }`}
-              >
-                {step}
-              </div>
-              <div className={styles.stepLabel}>
-                {step === 1 && 'Address'}
-                {step === 2 && 'Location'}
-                {step === 3 && 'Features'}
-                {step === 4 && 'Submit'}
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className={styles.progressHeader}>
+        <span>Step {currentStep} / 3</span>
+        <span>{stepLabels[currentStep - 1]}</span>
+      </div>
+      <div className={styles.progressBar}>
+        <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
       </div>
 
-      {/* Step Content */}
       {currentStep === 1 && renderStep1()}
       {currentStep === 2 && renderStep2()}
       {currentStep === 3 && renderStep3()}
-      {currentStep === 4 && (
-        <div className={styles.stepContent}>
-          <h2 className={styles.stepTitle}>Review & Submit</h2>
-          <p className={styles.stepDescription}>
-            Please review your information and submit to get your property estimate
-          </p>
-          <div className={styles.reviewSection}>
-            <div className={styles.reviewItem}>
-              <strong>Address:</strong> {formData.address}, {formData.postalCode}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Location:</strong> {formData.municipality}, {formData.department}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Type:</strong> {formData.type}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Area:</strong> {formData.area} m²
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Bedrooms:</strong> {formData.bedrooms} | <strong>Bathrooms:</strong> {formData.bathrooms} | <strong>Floors:</strong> {formData.floors}
-            </div>
-            <div className={styles.reviewItem}>
-              <strong>Features:</strong> {formData.hasBalcony && 'Balcony '} {formData.hasParking && 'Parking'}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Navigation Buttons */}
-      <div className={styles.buttonGroup}>
+      <div className={styles.stepActions}>
         {currentStep > 1 && (
           <button
             type="button"
-            onClick={handlePrevious}
+            onClick={(e) => handlePrevious(e)}
             className={styles.previousButton}
             disabled={loading}
           >
-            Previous
+            Back
           </button>
         )}
-        {currentStep < 4 ? (
+        {currentStep < 3 ? (
           <button
             type="button"
-            onClick={handleNext}
+            onClick={(e) => handleNext(e)}
             className={styles.nextButton}
             disabled={!validateStep(currentStep) || loading}
           >
@@ -452,9 +825,9 @@ export default function PropertyEstimateForm({
           <button
             type="submit"
             className={styles.submitButton}
-            disabled={loading || !validateStep(3)}
+            disabled={loading}
           >
-            {loading ? 'Calculating...' : 'Get Estimate'}
+            {loading ? 'Calculating...' : 'Get estimate'}
           </button>
         )}
       </div>

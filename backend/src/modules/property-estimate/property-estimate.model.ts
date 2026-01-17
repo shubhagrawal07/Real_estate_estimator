@@ -1,5 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, OneToMany, OneToOne } from 'typeorm';
 import type { User } from '../user/user.model';
+import type { PropertyCriteria } from './entities/property-criteria.model';
+import type { PropertyAmenity } from './entities/property-amenity.model';
+import type { PropertyParking } from './entities/property-parking.model';
+import type { PropertyFeature } from './entities/property-feature.model';
+import type { ApartmentDetails } from './entities/apartment-details.model';
+import type { HouseDetails } from './entities/house-details.model';
 
 export enum PropertyType {
   APARTMENT = 'Apartment',
@@ -15,6 +21,14 @@ export enum Deadline {
   IMMEDIATE = 'immediate',
   NOT_IMMEDIATE = 'not immediate',
 }
+
+export enum BuildingAge {
+  RECENT = 'recent',
+  OLD = 'old',
+}
+
+// OutdoorSpace moved to apartment-details.model.ts
+// PoolOption moved to house-details.model.ts
 
 export enum PropertyStatus {
   DRAFT = 'draft',
@@ -62,6 +76,14 @@ export class PropertyEstimate {
   condition?: string;
 
   @Column({
+    name: 'building_age',
+    type: 'enum',
+    enum: BuildingAge,
+    default: BuildingAge.RECENT,
+  })
+  buildingAge!: BuildingAge;
+
+  @Column({
     type: 'enum',
     enum: PropertyType,
   })
@@ -84,6 +106,26 @@ export class PropertyEstimate {
 
   @Column({ name: 'has_parking', type: 'boolean', default: false })
   hasParking!: boolean;
+
+  // Type-specific details (3NF normalization)
+  @OneToOne('ApartmentDetails', 'property', { nullable: true })
+  apartmentDetails?: ApartmentDetails;
+
+  @OneToOne('HouseDetails', 'property', { nullable: true })
+  houseDetails?: HouseDetails;
+
+  // Feature relationships (3NF)
+  @OneToMany('PropertyCriteria', 'property')
+  propertyCriteria!: PropertyCriteria[];
+
+  @OneToMany('PropertyAmenity', 'property')
+  propertyAmenities!: PropertyAmenity[];
+
+  @OneToMany('PropertyParking', 'property')
+  propertyParking!: PropertyParking[];
+
+  @OneToMany('PropertyFeature', 'property')
+  propertyFeatures!: PropertyFeature[];
 
   @Column({
     name: 'ownership_type',
