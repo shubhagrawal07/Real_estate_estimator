@@ -92,7 +92,12 @@ export default function MyEstimatesPage() {
   };
 
   const handleEstimateClick = (estimate: PropertyEstimate) => {
-    fetchEstimate(estimate.propertyId);
+    // If clicking the same estimate, collapse it
+    if (selectedEstimate?.propertyId === estimate.propertyId) {
+      setSelectedEstimate(null);
+    } else {
+      fetchEstimate(estimate.propertyId);
+    }
   };
 
   const handleRecalculate = async () => {
@@ -159,66 +164,67 @@ export default function MyEstimatesPage() {
       </div>
 
       <div className={styles.content}>
-        <div className={styles.listSection}>
-          <h2 className={styles.sectionTitle}>Your Estimates</h2>
-          {fetching ? (
-            <div className={styles.loading}>Loading estimates...</div>
-          ) : error ? (
-            <div className={styles.error}>{error}</div>
-          ) : estimates.length === 0 ? (
-            <div className={styles.empty}>
-              <p>No estimates found. Create your first estimate!</p>
-              <button 
-                className={styles.createButton}
-                onClick={() => router.push('/getEstimates')}
-              >
-                Get Estimate
-              </button>
-            </div>
-          ) : (
-            <div className={styles.estimatesList}>
-              {estimates.map((estimate) => (
+        {fetching ? (
+          <div className={styles.loading}>Loading estimates...</div>
+        ) : error ? (
+          <div className={styles.error}>{error}</div>
+        ) : estimates.length === 0 ? (
+          <div className={styles.empty}>
+            <p>No estimates found. Create your first estimate!</p>
+            <button 
+              className={styles.createButton}
+              onClick={() => router.push('/getEstimates')}
+            >
+              Get Estimate
+            </button>
+          </div>
+        ) : (
+          <div className={styles.estimatesList}>
+            {estimates.map((estimate) => (
+              <div key={estimate.propertyId} className={styles.estimateContainer}>
                 <div
-                  key={estimate.propertyId}
                   className={`${styles.estimateItem} ${
-                    selectedEstimate?.propertyId === estimate.propertyId ? styles.selected : ''
+                    selectedEstimate?.propertyId === estimate.propertyId ? styles.expanded : ''
                   }`}
                   onClick={() => handleEstimateClick(estimate)}
                 >
-                  <div className={styles.estimateHeader}>
-                    <span className={styles.status}>{estimate.status}</span>
-                    <span className={styles.date}>{formatDate(estimate.createdDate)}</span>
+                  <div className={styles.estimateSummary}>
+                    <div className={styles.estimateHeader}>
+                      <span className={styles.status}>{estimate.status}</span>
+                      <span className={styles.date}>{formatDate(estimate.createdDate)}</span>
+                    </div>
+                    <div className={styles.estimateAddress}>{estimate.address}</div>
+                    <div className={styles.estimateDetails}>
+                      <span>{estimate.type}</span>
+                      <span>•</span>
+                      <span>{estimate.area} m²</span>
+                      <span>•</span>
+                      <span>{estimate.bedrooms} bed</span>
+                    </div>
+                    <div className={styles.estimatePrice}>{formatPrice(estimate.estimatedPrice)}</div>
                   </div>
-                  <div className={styles.estimateAddress}>{estimate.address}</div>
-                  <div className={styles.estimateDetails}>
-                    <span>{estimate.type}</span>
-                    <span>•</span>
-                    <span>{estimate.area} m²</span>
-                    <span>•</span>
-                    <span>{estimate.bedrooms} bed</span>
+                  <div className={styles.expandIcon}>
+                    {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
                   </div>
-                  <div className={styles.estimatePrice}>{formatPrice(estimate.estimatedPrice)}</div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div className={styles.detailSection}>
-          {loading && !selectedEstimate ? (
-            <div className={styles.loading}>Loading estimate...</div>
-          ) : selectedEstimate ? (
-            <EstimateDisplay
-              estimate={selectedEstimate}
-              onRecalculate={handleRecalculate}
-              loading={loading}
-            />
-          ) : (
-            <div className={styles.noSelection}>
-              <p>Select an estimate from the list to view details</p>
-            </div>
-          )}
-        </div>
+                {selectedEstimate?.propertyId === estimate.propertyId && (
+                  <div className={styles.estimateDetailExpanded}>
+                    {loading ? (
+                      <div className={styles.loading}>Loading details...</div>
+                    ) : (
+                      <EstimateDisplay
+                        estimate={selectedEstimate}
+                        onRecalculate={handleRecalculate}
+                        loading={loading}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
