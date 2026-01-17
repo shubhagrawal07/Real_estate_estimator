@@ -23,4 +23,22 @@ export class PropertyEstimateRepo {
   async findOne(id: string): Promise<PropertyEstimate | null> {
     return this.repository.findOne({ where: { propertyId: id } });
   }
+
+  async findOneWithRelations(id: string): Promise<PropertyEstimate | null> {
+    return this.repository.findOne({
+      where: { propertyId: id },
+      relations: [
+        'apartmentDetails',
+        'houseDetails',
+        'propertyCriteria',
+        'propertyCriteria.criteria',
+        'propertyAmenities',
+        'propertyAmenities.amenity',
+        'propertyParking',
+        'propertyParking.parkingType',
+        'propertyFeatures',
+        'propertyFeatures.feature',
+      ],
+    });
+  }
 }

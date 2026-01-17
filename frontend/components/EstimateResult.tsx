@@ -39,6 +39,15 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
     ? Math.round(estimate.estimatedPrice / estimate.area) 
     : 0;
 
+  const hasKnownAddress =
+    Boolean(estimate.address) &&
+    estimate.address.toLowerCase() !== 'unknown' &&
+    estimate.postalCode > 0;
+
+  const hasKnownLocation =
+    Boolean(estimate.municipality) &&
+    estimate.municipality.toLowerCase() !== 'unknown';
+
   return (
     <div className={styles.result}>
       <div className={styles.resultHeader}>
@@ -49,20 +58,24 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
       </div>
 
       <div className={styles.resultDetails}>
-        <div className={styles.detailItem}>
-          <span className={styles.detailLabel}>Property Address:</span>
-          <span className={styles.detailValue}>
-            {estimate.address}, {estimate.postalCode}
-          </span>
-        </div>
+        {hasKnownAddress && (
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>Property Address:</span>
+            <span className={styles.detailValue}>
+              {estimate.address}, {estimate.postalCode}
+            </span>
+          </div>
+        )}
 
-        <div className={styles.detailItem}>
-          <span className={styles.detailLabel}>Location:</span>
-          <span className={styles.detailValue}>
-            {estimate.municipality}, {estimate.department}
-            {estimate.cadastralSection && ` (${estimate.cadastralSection})`}
-          </span>
-        </div>
+        {hasKnownLocation && (
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>Location:</span>
+            <span className={styles.detailValue}>
+              {estimate.municipality}, {estimate.department}
+              {estimate.cadastralSection && ` (${estimate.cadastralSection})`}
+            </span>
+          </div>
+        )}
 
         <div className={styles.detailGrid}>
           <div className={styles.detailItem}>
@@ -87,7 +100,7 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
             <span className={styles.detailValue}>{estimate.bathrooms || 'N/A'}</span>
           </div>
 
-          {estimate.floors && (
+          {estimate.floors !== undefined && (
             <div className={styles.detailItem}>
               <span className={styles.detailLabel}>Floors:</span>
               <span className={styles.detailValue}>{estimate.floors}</span>

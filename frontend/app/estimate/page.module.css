@@ -1,0 +1,55 @@
+.main {
+  min-height: 100vh;
+  background: #f5f6fb;
+  padding: 2rem 1rem;
+}
+
+.container {
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  text-align: center;
+}
+
+.title {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #222;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 1rem;
+}
+
+.emptyState {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.backLink {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #667eea;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  .main {
+    padding: 3rem 2rem;
+  }
+
+  .title {
+    font-size: 2.2rem;
+  }
+}
+
