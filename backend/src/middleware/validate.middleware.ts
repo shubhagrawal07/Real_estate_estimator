@@ -10,10 +10,7 @@ import { PoolOption } from '../modules/property-estimate/entities/house-details.
 
 export interface CreatePropertyEstimateDto {
   address: string;
-  postalCode: number;
-  department: string;
-  municipality: string;
-  cadastralSection: string;
+  locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
   buildingAge: BuildingAge;
   type: PropertyType;
   area: number;
@@ -56,10 +53,7 @@ export function validatePropertyEstimate(
 ): void {
   const { 
     address, 
-    postalCode, 
-    department, 
-    municipality, 
-    cadastralSection,
+    locationCode,
     type,
     area,
     bedrooms,
@@ -77,20 +71,20 @@ export function validatePropertyEstimate(
     errors.push('Address is required and must be a non-empty string');
   }
 
-  if (typeof postalCode !== 'number' || postalCode < 1000 || postalCode > 99999) {
-    errors.push('Postal Code is required and must be a valid number');
-  }
-
-  if (!department || typeof department !== 'string' || department.trim().length === 0) {
-    errors.push('Department is required and must be a non-empty string');
-  }
-
-  if (!municipality || typeof municipality !== 'string' || municipality.trim().length === 0) {
-    errors.push('Municipality is required and must be a non-empty string');
-  }
-
-  if (!cadastralSection || typeof cadastralSection !== 'string' || cadastralSection.trim().length === 0) {
-    errors.push('Cadastral Section is required and must be a non-empty string');
+  if (!locationCode || typeof locationCode !== 'string' || locationCode.trim().length === 0) {
+    errors.push('Location Code is required and must be a non-empty string');
+  } else if (locationCode.length !== 10) {
+    errors.push('Location Code must be exactly 10 characters (5 digits for code_insee + 3 digits padding + 2 characters for cadastral section)');
+  } else {
+    // Validate format: first 5 characters should be numeric (code_insee)
+    const codeInsee = locationCode.substring(0, 5);
+    const padding = locationCode.substring(5, 8);
+    if (!/^\d{5}$/.test(codeInsee)) {
+      errors.push('Location Code must start with 5 digits (code_insee)');
+    }
+    if (!/^\d{3}$/.test(padding)) {
+      errors.push('Location Code must have 3 numeric padding digits after code_insee');
+    }
   }
 
   if (!type || !Object.values(PropertyType).includes(type)) {

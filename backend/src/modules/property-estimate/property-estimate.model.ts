@@ -51,17 +51,8 @@ export class PropertyEstimate {
   @Column({ type: 'varchar', length: 500 })
   address!: string;
 
-  @Column({ name: 'postal_code', type: 'int' })
-  postalCode!: number;
-
-  @Column({ type: 'varchar', length: 255 })
-  department!: string;
-
-  @Column({ type: 'varchar', length: 255 })
-  municipality!: string;
-
-  @Column({ name: 'cadastral_section', type: 'varchar', length: 255 })
-  cadastralSection!: string;
+  @Column({ name: 'location_code', type: 'varchar', length: 10 })
+  locationCode!: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
 
   @Column({ type: 'int', nullable: true })
   impressions?: number;

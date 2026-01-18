@@ -74,6 +74,7 @@
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 0.75rem;
+  position: relative;
 }
 
 .addressInput,
@@ -112,6 +113,78 @@
 
 .postalInput[type=number] {
   -moz-appearance: textfield;
+}
+
+.suggestionsDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #667eea;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-top: -2px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestionItem {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  text-align: left;
+  border: none;
+  background: white;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestionItem:last-child {
+  border-bottom: none;
+}
+
+.suggestionItem:hover {
+  background: #f5f7fa;
+}
+
+.suggestionItem:focus {
+  outline: none;
+  background: #f0f4ff;
+}
+
+.suggestionLabel {
+  font-size: 0.95rem;
+  color: #333;
+  flex: 1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.suggestionPostcode {
+  font-size: 0.85rem;
+  color: #667eea;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
