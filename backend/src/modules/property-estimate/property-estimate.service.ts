@@ -127,9 +127,10 @@ export class PropertyEstimateService {
   ): Promise<number | null> {
     try {
       // Use locationCode as idpar (they have the same format: code_insee + 000 + section)
-      const salesData = await this.cityBlockSalesRepo.findByIdpar(locationCode);
+      // Get aggregated data from all records matching this idpar
+      const aggregatedData = await this.cityBlockSalesRepo.getAggregatedDataByIdpar(locationCode);
 
-      if (!salesData) {
+      if (!aggregatedData) {
         return null;
       }
 
@@ -137,13 +138,13 @@ export class PropertyEstimateService {
 
       if (propertyType === PropertyType.APARTMENT) {
         // For apartments: calculate euros/m² using apartment_sbati (living area) and apartment_price
-        if (salesData.apartmentCount > 0 && salesData.apartmentSbati > 0) {
-          pricePerSqM = Number(salesData.apartmentPrice) / Number(salesData.apartmentSbati);
+        if (aggregatedData.apartmentCount > 0 && aggregatedData.apartmentSbati > 0) {
+          pricePerSqM = aggregatedData.apartmentPrice / aggregatedData.apartmentSbati;
         }
       } else if (propertyType === PropertyType.HOUSE) {
         // For houses (mansions): calculate euros/m² using mansion_sbati (living area) and mansion_price
-        if (salesData.mansionCount > 0 && salesData.mansionSbati > 0) {
-          pricePerSqM = Number(salesData.mansionPrice) / Number(salesData.mansionSbati);
+        if (aggregatedData.mansionCount > 0 && aggregatedData.mansionSbati > 0) {
+          pricePerSqM = aggregatedData.mansionPrice / aggregatedData.mansionSbati;
         }
       }
 

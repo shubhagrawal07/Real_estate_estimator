@@ -1,3 +1,8 @@
+/**
+ * Type definitions for city block sales data module
+ */
+
+// API Response Types
 export interface MutationResult {
   idmutation: number;
   idmutinvar: string;
@@ -30,22 +35,15 @@ export interface ApiResponse {
   results: MutationResult[];
 }
 
-export interface PropertyData {
-  sterr: number;
-  sbati: number;
-  valeurfonc: number;
-  count: number;
+// Internal Data Types
+export interface SalesDataRecord {
+  idpar: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
+  sterr: number; // Land area (m²)
+  sbati: number; // Built area (m²)
+  price: number; // Property value (€)
+  date: Date; // Mutation date
+  type: string; // Property type (e.g., "APPARTEMENT", "MAISON")
 }
-
-// SectionData is an array of 2 objects: [apartment, mansion]
-export type SectionData = [PropertyData, PropertyData];
-
-// SectionMap with property data keyed by idpar
-export interface SectionMapEntry {
-  data: SectionData;
-}
-
-export type SectionMap = Record<string, SectionMapEntry>;
 
 export interface FetchDataParams {
   anneemut_min: number;

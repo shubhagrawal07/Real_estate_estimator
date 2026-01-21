@@ -1,10 +1,25 @@
-import { ApiResponse, FetchDataParams, SectionMap } from './types';
+/**
+ * API Service
+ * Handles fetching data from the DVF OpenData API with pagination support
+ */
+
+import { ApiResponse, FetchDataParams, SalesDataRecord } from './types';
 import { processResults } from './data-processor.service';
 
 const BASE_URL = 'https://apidf-preprod.cerema.fr/dvf_opendata/mutations/';
 
+// ============================================================================
+// URL Building
+// ============================================================================
+
 /**
- * Build API URL with query parameters
+ * Builds API URL with query parameters
+ * 
+ * @param anneemut_min - Minimum mutation year
+ * @param anneemut_max - Maximum mutation year
+ * @param code_insee - INSEE code (municipality identifier)
+ * @param page - Page number (default: 1)
+ * @returns Complete API URL with query parameters
  */
 function buildApiUrl(
   anneemut_min: number,
@@ -22,8 +37,16 @@ function buildApiUrl(
   return `${BASE_URL}?${params.toString()}`;
 }
 
+// ============================================================================
+// API Fetching
+// ============================================================================
+
 /**
- * Fetch data from a specific URL
+ * Fetches data from a specific API URL
+ * 
+ * @param url - Complete API URL to fetch from
+ * @returns API response data
+ * @throws Error if API request fails
  */
 async function fetchApiData(url: string): Promise<ApiResponse> {
   try {
@@ -45,13 +68,21 @@ async function fetchApiData(url: string): Promise<ApiResponse> {
   }
 }
 
+// ============================================================================
+// Main Export
+// ============================================================================
+
 /**
- * Fetch and process all data with pagination support
+ * Fetches and processes all data from API with pagination support
+ * Automatically handles pagination and processes all results
+ * 
+ * @param params - Fetch parameters (anneemut_min, anneemut_max, code_insee)
+ * @returns Array of all processed sales data records
  */
 export async function fetchAndProcessData(
   params: FetchDataParams
-): Promise<SectionMap> {
-  const map: SectionMap = {};
+): Promise<SalesDataRecord[]> {
+  const allRecords: SalesDataRecord[] = [];
   let currentUrl: string | null = buildApiUrl(
     params.anneemut_min,
     params.anneemut_max,
@@ -59,34 +90,47 @@ export async function fetchAndProcessData(
     1
   );
 
-  console.log(`Starting data fetch for code_insee: ${params.code_insee}`);
-  console.log(`Year range: ${params.anneemut_min} - ${params.anneemut_max}`);
+  console.log('[API] Starting data fetch', {
+    code_insee: params.code_insee,
+    year_range: `${params.anneemut_min}-${params.anneemut_max}`,
+  });
 
   let pageCount = 0;
 
+  // Fetch all pages
   while (currentUrl !== null) {
     pageCount++;
-    console.log(`Fetching page ${pageCount}...`);
+    console.log(`[API] Fetching page ${pageCount}...`);
 
-    const response: ApiResponse = await fetchApiData(currentUrl);
+    try {
+      const response: ApiResponse = await fetchApiData(currentUrl);
 
-    // Process results
-    processResults(response.results, map);
+      // Process results from this page
+      const records = processResults(response.results);
+      allRecords.push(...records);
 
-    console.log(
-      `Processed ${response.results.length} results. Total count: ${response.count}`
-    );
+      console.log(`[API] Page ${pageCount} processed:`, {
+        results_count: response.results.length,
+        records_extracted: records.length,
+        total_count: response.count,
+      });
 
-    // Check if there's a next page
-    if (response.next) {
-      currentUrl = response.next;
-    } else {
-      currentUrl = null;
+      // Check for next page
+      if (response.next) {
+        currentUrl = response.next;
+      } else {
+        currentUrl = null;
+      }
+    } catch (error) {
+      console.error(`[API] Error fetching page ${pageCount}:`, error);
+      throw error;
     }
   }
 
-  console.log(`Completed processing. Total pages: ${pageCount}`);
-  console.log(`Total sections processed: ${Object.keys(map).length}`);
+  console.log('[API] Data fetch completed', {
+    total_pages: pageCount,
+    total_records: allRecords.length,
+  });
 
-  return map;
+  return allRecords;
 }

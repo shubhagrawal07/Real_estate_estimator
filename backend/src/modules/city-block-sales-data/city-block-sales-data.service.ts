@@ -1,82 +1,135 @@
-import { FetchDataParams, SectionMap } from './types';
+/**
+ * City Block Sales Data Service
+ * Main service for processing and saving real estate data
+ */
+
+import { FetchDataParams, SalesDataRecord } from './types';
 import { fetchAndProcessData } from './api.service';
 import { CityBlockSalesDataRepo } from './city-block-sales-data.repo';
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 /**
- * Main service function that fetches and processes data
- * Takes anneemut_min, anneemut_max and code_insee as input
- * Returns the map with section key and mansion, apartment total data
- * Also saves the data to the database
+ * Extracts date in YYYY-MM-DD format from a Date object or string
+ * Uses the same format as stored in database (no timezone conversion)
+ * 
+ * @param date - Date object or string
+ * @returns Date string in YYYY-MM-DD format
+ */
+function extractDateString(date: Date | string): string {
+  if (typeof date === 'string') {
+    return date.split('T')[0];
+  }
+  
+  // Extract YYYY-MM-DD using local date components (same as stored in DB)
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// ============================================================================
+// Database Operations
+// ============================================================================
+
+/**
+ * Saves processed data to the database
+ * Only saves records with date > max date for this code_insee
+ * If no data exists for this code_insee, saves all records
+ * 
+ * @param records - Array of sales data records to save
+ * @param codeInsee - INSEE code for filtering
+ */
+async function saveToDatabase(
+  records: SalesDataRecord[],
+  codeInsee: string
+): Promise<void> {
+  const repo = new CityBlockSalesDataRepo();
+
+  if (records.length === 0) {
+    console.log('[DB] No records to save');
+    return;
+  }
+
+  // Get maximum date for this code_insee
+  const maxDate = await repo.getMaxDateByCodeInsee(codeInsee);
+  let recordsToSave: SalesDataRecord[];
+
+  if (maxDate === null) {
+    // No existing data - save all records
+    console.log(`[DB] No existing data for code_insee ${codeInsee}. Saving all ${records.length} records.`);
+    recordsToSave = records;
+  } else {
+    // Filter: only save records with date > maxDate
+    recordsToSave = records.filter((record) => {
+      const recordDateStr = extractDateString(record.date);
+      return recordDateStr > maxDate;
+    });
+    
+    console.log(`[DB] Date filtering for code_insee ${codeInsee}:`, {
+      max_date: maxDate,
+      total_records: records.length,
+      filtered_records: recordsToSave.length,
+      skipped: records.length - recordsToSave.length,
+    });
+  }
+
+  // Save filtered records
+  if (recordsToSave.length > 0) {
+    console.log(`[DB] Saving ${recordsToSave.length} records...`);
+    await repo.insertMany(recordsToSave);
+    console.log('[DB] ✅ Records saved successfully');
+  } else {
+    console.log('[DB] No new records to save (all dates <= max date)');
+  }
+}
+
+// ============================================================================
+// Main Service Function
+// ============================================================================
+
+/**
+ * Main service function that fetches and processes real estate data
+ * 
+ * Process:
+ * 1. Fetches data from API with pagination
+ * 2. Processes and filters records (apartments/maisons only)
+ * 3. Saves to database (only records with date > max date for code_insee)
+ * 
+ * @param params - Fetch parameters (anneemut_min, anneemut_max, code_insee)
+ * @returns Array of all processed records
  */
 export async function processRealEstateData(
   params: FetchDataParams
-): Promise<SectionMap> {
+): Promise<SalesDataRecord[]> {
   const { anneemut_min, anneemut_max, code_insee } = params;
 
-  console.log('Starting real estate data processing...');
-  console.log(`Parameters:`, {
-    anneemut_min,
-    anneemut_max,
+  console.log('[Service] Starting real estate data processing', {
     code_insee,
+    year_range: `${anneemut_min}-${anneemut_max}`,
   });
 
   try {
-    // Fetch and process data from API
-    const result = await fetchAndProcessData({
+    // Step 1: Fetch and process data from API
+    const records = await fetchAndProcessData({
       anneemut_min,
       anneemut_max,
       code_insee,
     });
 
-    console.log('Data processing completed successfully.');
-    console.log(`Total sections processed: ${Object.keys(result).length}`);
-
-    // Save to database
-    await saveToDatabase(result, code_insee, anneemut_min, anneemut_max);
-
-    return result;
-  } catch (error) {
-    console.error('Error processing real estate data:', error);
-    throw error;
-  }
-}
-
-/**
- * Save processed data to the database
- */
-async function saveToDatabase(
-  sectionMap: SectionMap,
-  codeInsee: string,
-  anneemutMin: number,
-  anneemutMax: number
-): Promise<void> {
-  const repo = new CityBlockSalesDataRepo();
-  const dataToSave = [];
-
-  for (const [idpar, entry] of Object.entries(sectionMap)) {
-    const apartmentData = entry.data[0];
-    const mansionData = entry.data[1];
-
-    dataToSave.push({
-      idpar: idpar,
-      anneemutMin: anneemutMin,
-      anneemutMax: anneemutMax,
-      apartmentCount: apartmentData.count,
-      apartmentSbati: apartmentData.sbati,
-      apartmentSterr: apartmentData.sterr,
-      apartmentPrice: apartmentData.valeurfonc,
-      mansionCount: mansionData.count,
-      mansionSbati: mansionData.sbati,
-      mansionSterr: mansionData.sterr,
-      mansionPrice: mansionData.valeurfonc,
+    console.log('[Service] Data processing completed', {
+      total_records: records.length,
     });
-  }
 
-  if (dataToSave.length > 0) {
-    console.log(`Saving ${dataToSave.length} records to database...`);
-    await repo.upsertMany(dataToSave);
-    console.log('✅ Data saved to database successfully.');
-  } else {
-    console.log('No data to save to database.');
+    // Step 2: Save to database with date validation
+    await saveToDatabase(records, code_insee);
+
+    console.log('[Service] ✅ Processing completed successfully');
+    return records;
+  } catch (error) {
+    console.error('[Service] ❌ Error processing real estate data:', error);
+    throw error;
   }
 }

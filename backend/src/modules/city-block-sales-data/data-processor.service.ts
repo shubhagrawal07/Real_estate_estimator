@@ -1,34 +1,55 @@
-import {
-  MutationResult,
-  PropertyData,
-  SectionData,
-  SectionMap,
-} from './types';
+/**
+ * Data Processor Service
+ * Processes API mutation results and converts them to database records
+ */
+
+import { MutationResult, SalesDataRecord } from './types';
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
- * Extract the idpar up to the last alphabetical character from l_idpar
+ * Constructs IdPar from API idpar value using location code format
+ * Format: {code_insee}{padding}{cadastral_section} = 10 characters
  * Example: "75101000AO0066" -> "75101000AO"
- * The idpar is combination of code_insee (75101) and cadastralSection (AO)
+ * 
+ * @param idparValue - Raw idpar value from API (e.g., "75101000AO0066")
+ * @returns Formatted idpar (e.g., "75101000AO") or null if invalid
  */
-function extractIdpar(idparValue: string): string | null {
-  // Match everything up to and including the last alphabetical character
+function constructIdpar(idparValue: string): string | null {
+  // Extract everything up to and including the last alphabetical character
   const match = idparValue.match(/^(.+[A-Z])/);
-  return match ? match[1] : null;
+  if (!match) {
+    return null;
+  }
+
+  const extracted = match[1];
+  
+  // Extract code_insee (first 5 digits)
+  const codeInseeMatch = extracted.match(/^(\d{5})/);
+  if (!codeInseeMatch) {
+    return null;
+  }
+
+  const codeInsee = codeInseeMatch[1];
+  
+  // Extract cadastral section (last 2 alphabetical characters)
+  const cadastralMatch = extracted.match(/([A-Z]{2})$/);
+  if (!cadastralMatch) {
+    return null;
+  }
+
+  const cadastralSection = cadastralMatch[1].toUpperCase();
+  
+  // Construct: code_insee (5 digits) + "000" + cadastral_section (2 chars)
+  return `${codeInsee}000${cadastralSection}`;
 }
 
 /**
- * Check if libtypbien is an apartment or mansion
- */
-function isApartment(libtypbien: string): boolean {
-  return libtypbien.toUpperCase().includes('APPARTEMENT');
-}
-
-function isMansion(libtypbien: string): boolean {
-  return libtypbien.toUpperCase().includes('MAISON');
-}
-
-/**
- * Parse numeric values from strings
+ * Parses numeric value from string
+ * @param value - String value to parse
+ * @returns Parsed number or 0 if invalid
  */
 function parseNumber(value: string): number {
   const parsed = parseFloat(value);
@@ -36,71 +57,93 @@ function parseNumber(value: string): number {
 }
 
 /**
- * Initialize empty section data
- * Array of 2 objects: [apartment, mansion]
+ * Parses date from string
+ * @param dateString - Date string to parse
+ * @returns Parsed Date object or current date if invalid
  */
-function initializeSectionData(): SectionData {
-  return [
-    { sterr: 0, sbati: 0, valeurfonc: 0, count: 0 }, // apartment (index 0)
-    { sterr: 0, sbati: 0, valeurfonc: 0, count: 0 }, // mansion (index 1)
-  ];
+function parseDate(dateString: string): Date {
+  const date = new Date(dateString);
+  return isNaN(date.getTime()) ? new Date() : date;
 }
 
 /**
- * Process a single mutation result and update the map
+ * Checks if property type is apartment or maison
+ * Excludes "APPARTEMENT INDETERMINE" (indeterminate apartment)
+ * 
+ * @param libtypbien - Property type string from API
+ * @returns true if apartment or maison (excluding indeterminate)
  */
-export function processMutation(
-  mutation: MutationResult,
-  map: SectionMap
-): void {
-  // Filter: only process if libtypbien contains MAISON or APPARTEMENT
-  if (!isApartment(mutation.libtypbien) && !isMansion(mutation.libtypbien)) {
-    return;
+function isApartmentOrMaison(libtypbien: string): boolean {
+  const upperType = libtypbien.toUpperCase();
+  
+  // Exclude indeterminate apartments
+  if (upperType.includes('APPARTEMENT INDETERMINE')) {
+    return false;
+  }
+  
+  // Include other apartments and maisons
+  return upperType.includes('APPARTEMENT') || upperType.includes('MAISON');
+}
+
+// ============================================================================
+// Processing Functions
+// ============================================================================
+
+/**
+ * Processes a single mutation result and converts to database records
+ * Filters out non-apartment/maison types and invalid idpar values
+ * 
+ * @param mutation - Single mutation result from API
+ * @returns Array of sales data records (one per idpar)
+ */
+function processMutation(mutation: MutationResult): SalesDataRecord[] {
+  const records: SalesDataRecord[] = [];
+
+  // Filter: only process apartments and maisons
+  if (!isApartmentOrMaison(mutation.libtypbien)) {
+    return records;
   }
 
-  // Process each l_idpar value
+  // Parse mutation data
+  const sterr = parseNumber(mutation.sterr);
+  const sbati = parseNumber(mutation.sbati);
+  const price = parseNumber(mutation.valeurfonc);
+  const date = parseDate(mutation.datemut);
+  const type = mutation.libtypbien;
+
+  // Process each idpar value - create one record per idpar
   for (const idparValue of mutation.l_idpar) {
-    const idpar = extractIdpar(idparValue);
+    const idpar = constructIdpar(idparValue);
     if (!idpar) {
-      continue;
+      continue; // Skip invalid idpar values
     }
 
-    // Initialize idpar if it doesn't exist
-    if (!map[idpar]) {
-      map[idpar] = {
-        data: initializeSectionData(),
-      };
-    }
-
-    // Parse numeric values
-    const sterr = parseNumber(mutation.sterr);
-    const sbati = parseNumber(mutation.sbati);
-    const valeurfonc = parseNumber(mutation.valeurfonc);
-
-    // Add values to the appropriate type (apartment or mansion)
-    // Array index 0 = apartment, index 1 = mansion
-    if (isApartment(mutation.libtypbien)) {
-      map[idpar].data[0].sterr += sterr;
-      map[idpar].data[0].sbati += sbati;
-      map[idpar].data[0].valeurfonc += valeurfonc;
-      map[idpar].data[0].count += 1;
-    } else if (isMansion(mutation.libtypbien)) {
-      map[idpar].data[1].sterr += sterr;
-      map[idpar].data[1].sbati += sbati;
-      map[idpar].data[1].valeurfonc += valeurfonc;
-      map[idpar].data[1].count += 1;
-    }
+    records.push({
+      idpar,
+      sterr,
+      sbati,
+      price,
+      date,
+      type,
+    });
   }
+
+  return records;
 }
 
 /**
- * Process all results from the API response
+ * Processes all mutation results from API response
+ * 
+ * @param results - Array of mutation results from API
+ * @returns Array of all sales data records to be stored
  */
-export function processResults(
-  results: MutationResult[],
-  map: SectionMap
-): void {
+export function processResults(results: MutationResult[]): SalesDataRecord[] {
+  const allRecords: SalesDataRecord[] = [];
+
   for (const result of results) {
-    processMutation(result, map);
+    const records = processMutation(result);
+    allRecords.push(...records);
   }
+
+  return allRecords;
 }

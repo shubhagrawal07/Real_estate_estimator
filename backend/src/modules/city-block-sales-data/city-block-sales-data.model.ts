@@ -1,50 +1,40 @@
+/**
+ * City Block Sales Data Model
+ * Database entity for storing individual property sales records from DVF API
+ */
+
 import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
-  UpdateDateColumn,
+  CreateDateColumn,
   Index,
 } from 'typeorm';
 
 @Entity('city_block_sales_data')
-@Index(['idpar'], { unique: true })
 export class CityBlockSalesData {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 20 })
-  idpar!: string;
+  @Column({ type: 'varchar', length: 10 })
+  @Index()
+  idpar!: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
 
-  @Column({ name: 'anneemut_min', type: 'int' })
-  anneemutMin!: number;
+  @Column({ type: 'numeric' })
+  sterr!: number; // Land area (m²)
 
-  @Column({ name: 'anneemut_max', type: 'int' })
-  anneemutMax!: number;
+  @Column({ type: 'numeric' })
+  sbati!: number; // Built area (m²)
 
-  @Column({ name: 'apartment_count', type: 'int', default: 0 })
-  apartmentCount!: number;
+  @Column({ type: 'numeric' })
+  price!: number; // Property value (€)
 
-  @Column({ name: 'apartment_sbati', type: 'numeric', default: 0 })
-  apartmentSbati!: number;
+  @Column({ type: 'date' })
+  date!: Date; // Mutation date
 
-  @Column({ name: 'apartment_sterr', type: 'numeric', default: 0 })
-  apartmentSterr!: number;
+  @Column({ type: 'varchar', length: 50 })
+  type!: string; // Property type (e.g., "APPARTEMENT", "MAISON")
 
-  @Column({ name: 'apartment_price', type: 'numeric', default: 0 })
-  apartmentPrice!: number;
-
-  @Column({ name: 'mansion_count', type: 'int', default: 0 })
-  mansionCount!: number;
-
-  @Column({ name: 'mansion_sbati', type: 'numeric', default: 0 })
-  mansionSbati!: number;
-
-  @Column({ name: 'mansion_sterr', type: 'numeric', default: 0 })
-  mansionSterr!: number;
-
-  @Column({ name: 'mansion_price', type: 'numeric', default: 0 })
-  mansionPrice!: number;
-
-  @UpdateDateColumn({ name: 'last_modified_date' })
-  lastModifiedDate!: Date;
+  @CreateDateColumn({ name: 'created_date' })
+  createdDate!: Date;
 }
