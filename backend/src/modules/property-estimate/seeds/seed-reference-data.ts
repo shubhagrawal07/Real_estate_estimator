@@ -33,6 +33,8 @@ export async function seedReferenceData() {
     { code: 'modern_bathroom', name: 'Modern bathroom', description: 'Recently renovated bathroom', priceImpact: 4.0 },
     { code: 'recent_kitchen', name: 'Recent equipped kitchen', description: 'Modern fitted kitchen', priceImpact: 5.0 },
     { code: 'fireplace', name: 'Fireplace or stove', description: 'Wood or pellet heating', priceImpact: 2.0 },
+    { code: 'electricity_standard', name: 'Electricity up to standard', description: 'Electrical installation meets current standards', priceImpact: 2.5 },
+    { code: 'double_triple_glazing', name: 'Double / triple glazing', description: 'Energy-efficient windows with double or triple glazing', priceImpact: 3.5 },
   ];
 
   for (const data of amenityData) {

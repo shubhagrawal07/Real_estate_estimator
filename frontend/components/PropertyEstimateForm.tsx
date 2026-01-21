@@ -65,6 +65,8 @@ interface PropertyData {
   amenityModernBathroom: boolean;
   amenityRecentKitchen: boolean;
   amenityFireplace: boolean;
+  amenityElectricityStandard: boolean;
+  amenityDoubleTripleGlazing: boolean;
 
   parkingGarage: boolean;
   parkingPrivate: boolean;
@@ -124,6 +126,8 @@ export default function PropertyEstimateForm({
     amenityModernBathroom: false,
     amenityRecentKitchen: false,
     amenityFireplace: false,
+    amenityElectricityStandard: false,
+    amenityDoubleTripleGlazing: false,
     parkingGarage: false,
     parkingPrivate: false,
     parkingShared: false,
@@ -154,6 +158,8 @@ export default function PropertyEstimateForm({
     | 'amenityModernBathroom'
     | 'amenityRecentKitchen'
     | 'amenityFireplace'
+    | 'amenityElectricityStandard'
+    | 'amenityDoubleTripleGlazing'
     | 'parkingGarage'
     | 'parkingPrivate'
     | 'parkingShared'
@@ -743,6 +749,26 @@ export default function PropertyEstimateForm({
           >
             <span className={styles.chipIcon}>🔥</span>
             Fireplace or stove
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.amenityElectricityStandard ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('amenityElectricityStandard')}
+          >
+            <span className={styles.chipIcon}>⚡</span>
+            Electricity up to standard
+          </button>
+          <button
+            type="button"
+            className={`${styles.chipButton} ${
+              formData.amenityDoubleTripleGlazing ? styles.chipSelected : ''
+            }`}
+            onClick={() => toggleField('amenityDoubleTripleGlazing')}
+          >
+            <span className={styles.chipIcon}>🪟</span>
+            Double / triple glazing
           </button>
         </div>
       </div>
