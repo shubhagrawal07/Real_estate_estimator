@@ -23,6 +23,27 @@
 .headerLeft {
   display: flex;
   align-items: center;
+  gap: 1rem;
+}
+
+.burgerButton {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #667eea;
+  transition: all 0.2s;
+  border-radius: 6px;
+}
+
+.burgerButton:hover {
+  background: #f5f7fa;
+}
+
+.burgerButton svg {
+  width: 24px;
+  height: 24px;
 }
 
 .logo {
@@ -115,7 +136,7 @@
   position: fixed;
   left: 0;
   top: 64px;
-  width: 250px;
+  width: 70px;
   height: calc(100vh - 64px);
   background: white;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
@@ -123,42 +144,22 @@
   z-index: 100;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.sidebar.open {
-  transform: translateX(0);
+.sidebar.expanded {
   width: 250px;
 }
 
-.sidebar:not(.open) {
-  transform: translateX(-200px);
-  width: 50px;
-}
-
-.sidebarToggle {
+.overlay {
   position: fixed;
-  top: 80px;
-  width: 32px;
-  height: 32px;
-  background: white;
-  border: 1px solid #ddd;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  color: #667eea;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
-  z-index: 102;
-  transition: left 0.3s ease;
-}
-
-.sidebarToggle:hover {
-  background: #f5f7fa;
-  border-color: #667eea;
-  transform: translateX(2px);
+  top: 64px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+  display: none;
 }
 
 .nav {
@@ -181,6 +182,8 @@
   text-align: left;
   font-size: 1rem;
   color: #666;
+  white-space: nowrap;
+  justify-content: flex-start;
 }
 
 .navItem:hover {
@@ -198,22 +201,34 @@
 .navIcon {
   font-size: 1.25rem;
   min-width: 24px;
+  width: 24px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .navLabel {
   white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+
+.sidebar.expanded .navLabel {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .main {
   flex: 1;
-  margin-left: 250px;
+  margin-left: 70px;
   padding: 2rem;
   transition: margin-left 0.3s ease;
 }
 
-.sidebar:not(.open) ~ .main {
-  margin-left: 50px;
+.sidebar.expanded ~ .main {
+  margin-left: 250px;
 }
 
 @media (max-width: 768px) {
@@ -225,27 +240,36 @@
     font-size: 1.25rem;
   }
 
+  .burgerButton {
+    display: block;
+  }
+
   .helpButton,
   .notificationButton {
     display: none;
   }
 
-  .sidebar {
-    width: 200px;
+  .overlay {
+    display: block;
   }
 
-  .sidebar.open {
-    width: 200px;
+  .sidebar {
+    width: 250px;
+    transform: translateX(-100%);
+  }
+
+  .sidebar.mobileOpen {
     transform: translateX(0);
   }
 
-  .sidebar:not(.open) {
-    transform: translateX(-200px);
-    width: 50px;
+  .sidebar.mobileOpen .navLabel {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
   }
 
-  .sidebarToggle {
-    top: 76px;
+  .sidebar.expanded {
+    width: 250px;
   }
 
   .main {
@@ -253,7 +277,8 @@
     padding: 1rem;
   }
 
-  .sidebar:not(.open) ~ .main {
+  .sidebar.expanded ~ .main,
+  .sidebar.mobileOpen ~ .main {
     margin-left: 0;
   }
 }

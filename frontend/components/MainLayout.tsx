@@ -13,24 +13,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Handle responsive sidebar
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      // Only auto-close on mobile, but allow manual toggle
-      if (mobile && sidebarOpen) {
-        // Keep current state, don't force close
+      // Close mobile sidebar when switching to desktop
+      if (!mobile) {
+        setMobileSidebarOpen(false);
       }
     };
     
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarOpen]);
+  }, []);
 
   // Link draft estimates when user logs in
   useEffect(() => {
@@ -83,6 +84,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
+          {/* Burger menu for mobile */}
+          {isMobile && (
+            <button
+              className={styles.burgerButton}
+              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+              aria-label="Toggle menu"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {mobileSidebarOpen ? (
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                ) : (
+                  <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                )}
+              </svg>
+            </button>
+          )}
           <h1 className={styles.logo} onClick={() => router.push('/')}>
             Real Estate Estimator
           </h1>
@@ -120,26 +137,36 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </header>
 
       <div className={styles.body}>
-        {/* Sidebar Toggle - Always visible */}
-        <button
-          className={styles.sidebarToggle}
-          style={{ left: sidebarOpen ? '250px' : '0' }}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          {sidebarOpen ? '◀' : '▶'}
-        </button>
+        {/* Mobile overlay */}
+        {isMobile && mobileSidebarOpen && (
+          <div 
+            className={styles.overlay}
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+        )}
         
-        {/* Sidebar */}
-        <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
+        {/* Sidebar - Always visible with icons, expands on hover (desktop) or toggle (mobile) */}
+        <aside 
+          className={`${styles.sidebar} ${sidebarHovered ? styles.expanded : ''} ${isMobile && mobileSidebarOpen ? styles.mobileOpen : ''}`}
+          onMouseEnter={() => !isMobile && setSidebarHovered(true)}
+          onMouseLeave={() => !isMobile && setSidebarHovered(false)}
+        >
           <nav className={styles.nav}>
             {navItems.map((item) => (
               <button
                 key={item.path}
                 className={`${styles.navItem} ${isActive(item.path) ? styles.active : ''}`}
-                onClick={() => router.push(item.path)}
+                onClick={() => {
+                  router.push(item.path);
+                  // Close mobile sidebar when navigating
+                  if (isMobile) {
+                    setMobileSidebarOpen(false);
+                  }
+                }}
+                title={item.label}
               >
                 <span className={styles.navIcon}>{item.icon}</span>
-                {sidebarOpen && <span className={styles.navLabel}>{item.label}</span>}
+                <span className={styles.navLabel}>{item.label}</span>
               </button>
             ))}
           </nav>
