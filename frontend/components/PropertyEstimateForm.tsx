@@ -297,8 +297,10 @@ export default function PropertyEstimateForm({
           Boolean(formData.outdoorSpace)
         );
       }
+      const landSize = formData.landSize;
       return (
-        (formData.landSize || 0) >= MIN_LAND_SIZE &&
+        landSize !== null &&
+        landSize >= MIN_LAND_SIZE &&
         formData.semiDetached !== null &&
         Boolean(formData.poolOption)
       );
@@ -485,7 +487,10 @@ export default function PropertyEstimateForm({
     </div>
   );
 
-  const renderStep2 = () => (
+  const renderStep2 = () => {
+    const landSize = formData.landSize ?? MIN_LAND_SIZE;
+    
+    return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Size & layout</h2>
       <p className={styles.stepDescription}>Slide or tap the buttons to adjust.</p>
@@ -663,7 +668,7 @@ export default function PropertyEstimateForm({
               <button
                 type="button"
                 className={styles.iconButton}
-                onClick={() => setField('landSize', Math.max(MIN_LAND_SIZE, (formData.landSize || MIN_LAND_SIZE) - 10))}
+                onClick={() => setField('landSize', Math.max(MIN_LAND_SIZE, landSize - 10))}
               >
                 -
               </button>
@@ -671,19 +676,19 @@ export default function PropertyEstimateForm({
                 type="range"
                 min={MIN_LAND_SIZE}
                 max={MAX_LAND_SIZE}
-                value={formData.landSize || MIN_LAND_SIZE}
+                value={landSize}
                 onChange={(event) => setField('landSize', Number(event.target.value))}
                 className={styles.slider}
               />
               <button
                 type="button"
                 className={styles.iconButton}
-                onClick={() => setField('landSize', Math.min(MAX_LAND_SIZE, (formData.landSize || MIN_LAND_SIZE) + 10))}
+                onClick={() => setField('landSize', Math.min(MAX_LAND_SIZE, landSize + 10))}
               >
                 +
               </button>
             </div>
-            <div className={styles.valueBadge}>{formData.landSize} m²</div>
+            <div className={styles.valueBadge}>{landSize} m²</div>
           </div>
 
           <div className={styles.section}>
@@ -750,7 +755,8 @@ export default function PropertyEstimateForm({
         </>
       )}
     </div>
-  );
+    );
+  };
 
   const renderStep3 = () => (
     <div className={styles.stepContent}>
@@ -925,9 +931,11 @@ export default function PropertyEstimateForm({
         <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
       </div>
 
-      {currentStep === 1 && renderStep1()}
-      {currentStep === 2 && renderStep2()}
-      {currentStep === 3 && renderStep3()}
+      <div key={currentStep} className={styles.stepContainer}>
+        {currentStep === 1 && renderStep1()}
+        {currentStep === 2 && renderStep2()}
+        {currentStep === 3 && renderStep3()}
+      </div>
 
       <div className={styles.stepActions}>
         {currentStep > 1 && (
