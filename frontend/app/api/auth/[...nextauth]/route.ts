@@ -6,6 +6,11 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      authorization: {
+        params: {
+          scope: 'openid email profile',
+        },
+      },
     }),
   ],
   callbacks: {
@@ -24,8 +29,8 @@ export const authOptions: NextAuthOptions = {
           if (response.ok) {
             const data = await response.json();
             // Store the JWT token in the user object
-            user.backendToken = data.token;
-            user.backendUserId = data.user.userId;
+            (user as any).backendToken = data.token;
+            (user as any).backendUserId = data.user.userId;
             return true;
           }
         } catch (error) {
@@ -35,16 +40,39 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, user, account }) {
-      if (user && (user as any).backendToken) {
-        token.backendToken = (user as any).backendToken;
-        token.backendUserId = (user as any).backendUserId;
+      // Initial sign in - preserve user data including image
+      if (user) {
+        token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
+        // Preserve image from Google - it should be in user.image
+        if (user.image) {
+          token.picture = user.image;
+        }
+        if ((user as any).backendToken) {
+          token.backendToken = (user as any).backendToken;
+          token.backendUserId = (user as any).backendUserId;
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      if (token.backendToken) {
-        (session as any).backendToken = token.backendToken;
-        (session as any).backendUserId = token.backendUserId;
+      // Include user image and other data in session
+      if (token) {
+        if (session.user) {
+          const user = session.user as any;
+          if (token.id) user.id = token.id as string;
+          if (token.name) user.name = token.name as string;
+          if (token.email) user.email = token.email as string;
+          // Ensure image is set from token.picture
+          if (token.picture) {
+            user.image = token.picture as string;
+          }
+        }
+        if (token.backendToken) {
+          (session as any).backendToken = token.backendToken;
+          (session as any).backendUserId = token.backendUserId;
+        }
       }
       return session;
     },

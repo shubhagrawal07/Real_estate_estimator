@@ -37,6 +37,8 @@ export interface CreatePropertyEstimateDto {
   amenityModernBathroom?: boolean;
   amenityRecentKitchen?: boolean;
   amenityFireplace?: boolean;
+  amenityElectricityStandard?: boolean;
+  amenityDoubleTripleGlazing?: boolean;
   parkingGarage?: boolean;
   parkingPrivate?: boolean;
   parkingShared?: boolean;
