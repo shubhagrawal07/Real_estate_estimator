@@ -1,11 +1,16 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
-import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus } from './property-estimate.model';
+import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus, BuildingAge } from './property-estimate.model';
 import { combineLocationCode, parseLocationCode } from './utils/location-code.util';
 import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
+import { OutdoorSpace } from './entities/apartment-details.model';
+import { PoolOption } from './entities/house-details.model';
 
 export interface CreatePropertyEstimateDto {
   address: string;
   locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
+  longitude?: number;
+  latitude?: number;
+  buildingAge: BuildingAge;
   type: PropertyType;
   area: number;
   bedrooms: number;
@@ -13,6 +18,30 @@ export interface CreatePropertyEstimateDto {
   floors: number;
   hasBalcony: boolean;
   hasParking: boolean;
+  doubleLivingRoom?: boolean;
+  openKitchen?: boolean;
+  laundryCellar?: boolean;
+  apartmentElevator?: boolean | null;
+  apartmentFloor?: number | null;
+  outdoorSpace?: OutdoorSpace;
+  landSize?: number | null;
+  semiDetached?: boolean | null;
+  poolOption?: PoolOption;
+  criteriaCalm?: boolean;
+  criteriaBright?: boolean;
+  criteriaNearAmenities?: boolean;
+  criteriaNoVisAvis?: boolean;
+  criteriaWellConnected?: boolean;
+  amenityAirConditioning?: boolean;
+  amenityModernBathroom?: boolean;
+  amenityRecentKitchen?: boolean;
+  amenityFireplace?: boolean;
+  amenityElectricityStandard?: boolean;
+  amenityDoubleTripleGlazing?: boolean;
+  parkingGarage?: boolean;
+  parkingPrivate?: boolean;
+  parkingShared?: boolean;
+  parkingStreet?: boolean;
   ownershipType: OwnershipType;
   deadline: Deadline;
   condition?: string;
@@ -30,7 +59,7 @@ export class PropertyEstimateService {
   async createEstimate(dto: CreatePropertyEstimateDto, userId?: string): Promise<PropertyEstimate> {
     const estimatedPrice = await this.calculatePrice(dto);
 
-    return this.repo.create({
+    return this.repo.createWithRelations({
       ...dto,
       estimatedPrice,
       impressions: 0,
@@ -187,6 +216,7 @@ export class PropertyEstimateService {
     const dto: CreatePropertyEstimateDto = {
       address: estimate.address,
       locationCode: estimate.locationCode,
+      buildingAge: estimate.buildingAge,
       type: estimate.type,
       area: estimate.area,
       bedrooms: estimate.bedrooms,

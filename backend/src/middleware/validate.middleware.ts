@@ -11,6 +11,8 @@ import { PoolOption } from '../modules/property-estimate/entities/house-details.
 export interface CreatePropertyEstimateDto {
   address: string;
   locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
+  longitude?: number;
+  latitude?: number;
   buildingAge: BuildingAge;
   type: PropertyType;
   area: number;
@@ -56,6 +58,8 @@ export function validatePropertyEstimate(
   const { 
     address, 
     locationCode,
+    longitude,
+    latitude,
     type,
     area,
     bedrooms,
@@ -127,6 +131,14 @@ export function validatePropertyEstimate(
 
   if (condition !== undefined && condition !== null && condition !== '' && typeof condition !== 'string') {
     errors.push('Condition must be a string if provided');
+  }
+
+  if (longitude !== undefined && longitude !== null && (typeof longitude !== 'number' || longitude < -180 || longitude > 180)) {
+    errors.push('Longitude must be a number between -180 and 180 if provided');
+  }
+
+  if (latitude !== undefined && latitude !== null && (typeof latitude !== 'number' || latitude < -90 || latitude > 90)) {
+    errors.push('Latitude must be a number between -90 and 90 if provided');
   }
 
   if (errors.length > 0) {

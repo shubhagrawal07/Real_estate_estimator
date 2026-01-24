@@ -54,6 +54,12 @@ export class PropertyEstimate {
   @Column({ name: 'location_code', type: 'varchar', length: 10 })
   locationCode!: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
 
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  longitude?: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  latitude?: number;
+
   @Column({ type: 'int', nullable: true })
   impressions?: number;
 

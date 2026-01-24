@@ -29,6 +29,8 @@ interface PropertyData {
   // Required fields
   address: string;
   locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
+  longitude?: number;
+  latitude?: number;
 
   // Page 1
   type: PropertyType;
@@ -103,6 +105,8 @@ export default function PropertyEstimateForm({
   const [formData, setFormData] = useState<PropertyData>({
     address: '',
     locationCode: '0000000000', // Default: 5 zeros for code_insee + 000 padding + 00 for cadastral section
+    longitude: undefined,
+    latitude: undefined,
     type: PropertyType.APARTMENT,
     buildingAge: 'recent',
     condition: 'excellent',
@@ -203,6 +207,12 @@ export default function PropertyEstimateForm({
         const padding = '000';
         const cadastralSection = geocodingResult.cadastralSection?.toUpperCase().padEnd(2, '0').substring(0, 2) || '00';
         setField('locationCode', `${codeInsee}${padding}${cadastralSection}`);
+      }
+
+      // Set longitude and latitude from geocoding result
+      if (geocodingResult.coordinates) {
+        setField('longitude', geocodingResult.coordinates.lon);
+        setField('latitude', geocodingResult.coordinates.lat);
       }
 
       setAddressInputValue(geocodingResult.address);
