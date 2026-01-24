@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import PropertyEstimateForm from '@/components/PropertyEstimateForm';
 import EstimateResult from '@/components/EstimateResult';
+import LoadingScreen from '@/components/LoadingScreen';
 import styles from './page.module.css';
 
 export default function GetEstimatesPage() {
@@ -16,6 +17,9 @@ export default function GetEstimatesPage() {
     setLoading(true);
     setError(null);
     setEstimate(null);
+
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 5000; // 5 seconds minimum loading time
 
     try {
       const headers: HeadersInit = {
@@ -56,9 +60,25 @@ export default function GetEstimatesPage() {
         localStorage.setItem('draftEstimates', JSON.stringify(draftEstimates));
       }
       
+      // Ensure loading screen is visible for at least 5 seconds
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+      
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+      
       // Set estimate to display on same page
       setEstimate(data);
     } catch (err) {
+      // Ensure loading screen is visible for at least 5 seconds even on error
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+      
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+
       if (err instanceof TypeError && err.message.includes('fetch')) {
         setError('Cannot connect to server. Please make sure the backend is running on http://localhost:3001');
       } else {
@@ -77,6 +97,8 @@ export default function GetEstimatesPage() {
           Fill out the form below to get an instant estimate of your property's current market value
         </p>
       </div>
+
+      {loading && <LoadingScreen />}
 
       <div className={styles.content}>
         {!estimate ? (

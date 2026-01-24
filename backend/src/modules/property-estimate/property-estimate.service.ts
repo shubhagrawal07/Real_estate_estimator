@@ -1,12 +1,16 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
-import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus } from './property-estimate.model';
+import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus, BuildingAge } from './property-estimate.model';
+import { combineLocationCode, parseLocationCode } from './utils/location-code.util';
+import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
+import { OutdoorSpace } from './entities/apartment-details.model';
+import { PoolOption } from './entities/house-details.model';
 
 export interface CreatePropertyEstimateDto {
   address: string;
-  postalCode: number;
-  department: string;
-  municipality: string;
-  cadastralSection: string;
+  locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
+  longitude?: number;
+  latitude?: number;
+  buildingAge: BuildingAge;
   type: PropertyType;
   area: number;
   bedrooms: number;
@@ -14,6 +18,30 @@ export interface CreatePropertyEstimateDto {
   floors: number;
   hasBalcony: boolean;
   hasParking: boolean;
+  doubleLivingRoom?: boolean;
+  openKitchen?: boolean;
+  laundryCellar?: boolean;
+  apartmentElevator?: boolean | null;
+  apartmentFloor?: number | null;
+  outdoorSpace?: OutdoorSpace;
+  landSize?: number | null;
+  semiDetached?: boolean | null;
+  poolOption?: PoolOption;
+  criteriaCalm?: boolean;
+  criteriaBright?: boolean;
+  criteriaNearAmenities?: boolean;
+  criteriaNoVisAvis?: boolean;
+  criteriaWellConnected?: boolean;
+  amenityAirConditioning?: boolean;
+  amenityModernBathroom?: boolean;
+  amenityRecentKitchen?: boolean;
+  amenityFireplace?: boolean;
+  amenityElectricityStandard?: boolean;
+  amenityDoubleTripleGlazing?: boolean;
+  parkingGarage?: boolean;
+  parkingPrivate?: boolean;
+  parkingShared?: boolean;
+  parkingStreet?: boolean;
   ownershipType: OwnershipType;
   deadline: Deadline;
   condition?: string;
@@ -21,15 +49,17 @@ export interface CreatePropertyEstimateDto {
 
 export class PropertyEstimateService {
   private repo: PropertyEstimateRepo;
+  private cityBlockSalesRepo: CityBlockSalesDataRepo;
 
   constructor() {
     this.repo = new PropertyEstimateRepo();
+    this.cityBlockSalesRepo = new CityBlockSalesDataRepo();
   }
 
   async createEstimate(dto: CreatePropertyEstimateDto, userId?: string): Promise<PropertyEstimate> {
-    const estimatedPrice = this.calculatePrice(dto);
+    const estimatedPrice = await this.calculatePrice(dto);
 
-    return this.repo.create({
+    return this.repo.createWithRelations({
       ...dto,
       estimatedPrice,
       impressions: 0,
@@ -38,12 +68,22 @@ export class PropertyEstimateService {
     });
   }
 
-  private calculatePrice(dto: CreatePropertyEstimateDto): number {
-    let basePricePerSqM = 2000; // Base price per square meter
+  private async calculatePrice(dto: CreatePropertyEstimateDto): Promise<number> {
+    // Try to get euros/m² from city_block_sales_data first
+    let basePricePerSqM = await this.getPricePerSqMFromSalesData(dto.locationCode, dto.type);
+    
+    // If no sales data found, fall back to default pricing
+    if (!basePricePerSqM) {
+      basePricePerSqM = 2000; // Base price per square meter
 
-    // Department/municipality multiplier (location-based pricing)
-    const locationMultiplier = this.getLocationMultiplier(dto.department, dto.municipality);
-    basePricePerSqM *= locationMultiplier;
+      // Extract department from location code for location-based pricing
+      const locationParts = parseLocationCode(dto.locationCode);
+      const department = locationParts?.department || '';
+      
+      // Department-based pricing multiplier
+      const locationMultiplier = this.getLocationMultiplier(department);
+      basePricePerSqM *= locationMultiplier;
+    }
 
     // Property type multiplier
     const typeMultiplier = dto.type === PropertyType.HOUSE ? 1.2 : 1.0;
@@ -84,23 +124,64 @@ export class PropertyEstimateService {
     return Math.round(estimatedPrice);
   }
 
-  private getLocationMultiplier(department: string, municipality: string): number {
-    // Simplified location-based pricing
-    // In a real application, this would use more sophisticated location data
+  private getLocationMultiplier(department: string): number {
+    // Simplified location-based pricing using department code
+    // Department codes: 75=Paris, 69=Lyon, 13=Marseille, 31=Toulouse, 06=Nice, 44=Nantes, 67=Strasbourg, 34=Montpellier, 33=Bordeaux, 59=Lille
     const locationMultipliers: { [key: string]: number } = {
-      'Paris': 2.5,
-      'Lyon': 1.8,
-      'Marseille': 1.6,
-      'Toulouse': 1.4,
-      'Nice': 1.9,
-      'Nantes': 1.5,
-      'Strasbourg': 1.3,
-      'Montpellier': 1.4,
-      'Bordeaux': 1.6,
-      'Lille': 1.2,
+      '75': 2.5,  // Paris
+      '69': 1.8,  // Lyon
+      '13': 1.6,  // Marseille
+      '31': 1.4,  // Toulouse
+      '06': 1.9,  // Nice
+      '44': 1.5,  // Nantes
+      '67': 1.3,  // Strasbourg
+      '34': 1.4,  // Montpellier
+      '33': 1.6,  // Bordeaux
+      '59': 1.2,  // Lille
     };
 
-    return locationMultipliers[municipality] || locationMultipliers[department] || 1.0;
+    return locationMultipliers[department] || 1.0;
+  }
+
+  /**
+   * Get price per square meter from city_block_sales_data
+   * Uses locationCode as idpar to query the sales data
+   * @param locationCode - Location code (format: {code_insee}{padding}{cadastral_section}, e.g., "83137000BY")
+   * @param propertyType - Property type (APARTMENT or HOUSE)
+   * @returns Price per square meter in euros, or null if no data found
+   */
+  private async getPricePerSqMFromSalesData(
+    locationCode: string,
+    propertyType: PropertyType
+  ): Promise<number | null> {
+    try {
+      // Use locationCode as idpar (they have the same format: code_insee + 000 + section)
+      // Get aggregated data from all records matching this idpar
+      const aggregatedData = await this.cityBlockSalesRepo.getAggregatedDataByIdpar(locationCode);
+
+      if (!aggregatedData) {
+        return null;
+      }
+
+      let pricePerSqM: number | null = null;
+
+      if (propertyType === PropertyType.APARTMENT) {
+        // For apartments: calculate euros/m² using apartment_sbati (living area) and apartment_price
+        if (aggregatedData.apartmentCount > 0 && aggregatedData.apartmentSbati > 0) {
+          pricePerSqM = aggregatedData.apartmentPrice / aggregatedData.apartmentSbati;
+        }
+      } else if (propertyType === PropertyType.HOUSE) {
+        // For houses (mansions): calculate euros/m² using mansion_sbati (living area) and mansion_price
+        if (aggregatedData.mansionCount > 0 && aggregatedData.mansionSbati > 0) {
+          pricePerSqM = aggregatedData.mansionPrice / aggregatedData.mansionSbati;
+        }
+      }
+
+      return pricePerSqM && pricePerSqM > 0 ? pricePerSqM : null;
+    } catch (error) {
+      console.error('Error fetching price per sqm from sales data:', error);
+      return null;
+    }
   }
 
   private getConditionMultiplier(condition?: string): number {
@@ -134,10 +215,8 @@ export class PropertyEstimateService {
     // Convert estimate to DTO format for price calculation
     const dto: CreatePropertyEstimateDto = {
       address: estimate.address,
-      postalCode: estimate.postalCode,
-      department: estimate.department,
-      municipality: estimate.municipality,
-      cadastralSection: estimate.cadastralSection,
+      locationCode: estimate.locationCode,
+      buildingAge: estimate.buildingAge,
       type: estimate.type,
       area: estimate.area,
       bedrooms: estimate.bedrooms,
@@ -150,7 +229,7 @@ export class PropertyEstimateService {
       condition: estimate.condition,
     };
 
-    const newEstimatedPrice = this.calculatePrice(dto);
+    const newEstimatedPrice = await this.calculatePrice(dto);
     
     // Update only the estimated price
     return this.repo.updateEstimatedPrice(propertyId, newEstimatedPrice);

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
+import { useGeocoding, type AddressSuggestion } from '@/hooks/useGeocoding';
 import styles from './PropertyEstimateForm.module.css';
 
 export enum PropertyType {
@@ -25,12 +26,11 @@ type PoolOption = 'pool' | 'possible' | 'not_possible';
 type ConditionValue = 'excellent' | 'good' | 'needs renovation';
 
 interface PropertyData {
-  // Legacy required fields (kept for backend validation)
+  // Required fields
   address: string;
-  postalCode: number;
-  department: string;
-  municipality: string;
-  cadastralSection: string;
+  locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
+  longitude?: number;
+  latitude?: number;
 
   // Page 1
   type: PropertyType;
@@ -95,12 +95,18 @@ export default function PropertyEstimateForm({
   loading,
 }: PropertyEstimateFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const isSelectingAddressRef = useRef(false);
+  const { suggestions, loading: geocodingLoading, searchAddresses, selectAddress, clearSuggestions } = useGeocoding();
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [addressInputValue, setAddressInputValue] = useState('');
+
   const [formData, setFormData] = useState<PropertyData>({
     address: '',
-    postalCode: 0,
-    department: 'Unknown',
-    municipality: 'Unknown',
-    cadastralSection: 'Unknown',
+    locationCode: '0000000000', // Default: 5 zeros for code_insee + 000 padding + 00 for cadastral section
+    longitude: undefined,
+    latitude: undefined,
     type: PropertyType.APARTMENT,
     buildingAge: 'recent',
     condition: 'excellent',
@@ -144,6 +150,88 @@ export default function PropertyEstimateForm({
       [key]: value,
     }));
   };
+
+  // Handle address input change with debouncing
+  useEffect(() => {
+    // Don't show suggestions if we're in the process of selecting an address
+    if (isSelectingAddressRef.current) {
+      isSelectingAddressRef.current = false;
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      if (addressInputValue && addressInputValue.length >= 3) {
+        searchAddresses(addressInputValue);
+        setShowSuggestions(true);
+      } else {
+        clearSuggestions();
+        setShowSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [addressInputValue, searchAddresses, clearSuggestions]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        addressInputRef.current &&
+        !addressInputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleAddressSelect = async (suggestion: AddressSuggestion) => {
+    try {
+      // Set flag to prevent useEffect from reopening suggestions
+      isSelectingAddressRef.current = true;
+      
+      const geocodingResult = await selectAddress(suggestion);
+      
+      setField('address', geocodingResult.address);
+      
+      // Set locationCode from geocoding result
+      if (geocodingResult.locationCode) {
+        setField('locationCode', geocodingResult.locationCode);
+      } else {
+        // Fallback: construct locationCode from available data
+        const codeInsee = geocodingResult.citycode?.padStart(5, '0') || '00000';
+        const padding = '000';
+        const cadastralSection = geocodingResult.cadastralSection?.toUpperCase().padEnd(2, '0').substring(0, 2) || '00';
+        setField('locationCode', `${codeInsee}${padding}${cadastralSection}`);
+      }
+
+      // Set longitude and latitude from geocoding result
+      if (geocodingResult.coordinates) {
+        setField('longitude', geocodingResult.coordinates.lon);
+        setField('latitude', geocodingResult.coordinates.lat);
+      }
+
+      setAddressInputValue(geocodingResult.address);
+      setShowSuggestions(false);
+      clearSuggestions();
+    } catch (error) {
+      console.error('Error selecting address:', error);
+      // Keep the input value even if geocoding fails
+      setAddressInputValue(formData.address);
+      isSelectingAddressRef.current = false;
+    }
+  };
+
+  // Sync addressInputValue with formData.address
+  useEffect(() => {
+    if (!formData.address) {
+      setAddressInputValue('');
+    }
+  }, [formData.address]);
 
   type ToggleKey =
     | 'doubleLivingRoom'
@@ -201,8 +289,8 @@ export default function PropertyEstimateForm({
       return Boolean(
         formData.address && 
         formData.address.trim().length > 0 &&
-        formData.postalCode >= 1000 &&
-        formData.postalCode <= 99999 &&
+        formData.locationCode &&
+        formData.locationCode.length === 10 &&
         formData.type && 
         formData.buildingAge && 
         formData.condition
@@ -272,26 +360,50 @@ export default function PropertyEstimateForm({
       <p className={styles.stepDescription}>Start with your property address.</p>
 
       <div className={styles.section}>
-        <span className={styles.sectionTitle}>Property address & postal code</span>
-        <div className={styles.addressRow}>
+        <span className={styles.sectionTitle}>Property address</span>
+        <div style={{ position: 'relative', width: '100%' }}>
           <input
+            ref={addressInputRef}
             type="text"
-            value={formData.address}
-            onChange={(e) => setField('address', e.target.value)}
-            placeholder="Address (e.g., 123 Rue de la Paix)"
+            value={addressInputValue}
+            onChange={(e) => {
+              setAddressInputValue(e.target.value);
+              setField('address', e.target.value);
+            }}
+            onFocus={() => {
+              // Only show suggestions when user actively focuses and types
+              if (addressInputValue && addressInputValue.length >= 3) {
+                setShowSuggestions(true);
+              }
+            }}
+            placeholder="Start typing address..."
             className={styles.addressInput}
-            autoComplete="street-address"
+            autoComplete="off"
           />
-          <input
-            type="number"
-            value={formData.postalCode || ''}
-            onChange={(e) => setField('postalCode', e.target.value ? Number(e.target.value) : 0)}
-            placeholder="Postal code"
-            className={styles.postalInput}
-            autoComplete="postal-code"
-            min="1000"
-            max="99999"
-          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div ref={suggestionsRef} className={styles.suggestionsDropdown}>
+              {geocodingLoading && (
+                <div className={styles.suggestionItem}>
+                  <span>Searching...</span>
+                </div>
+              )}
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  className={styles.suggestionItem}
+                  onClick={() => handleAddressSelect(suggestion)}
+                >
+                  <span className={styles.suggestionLabel}>{suggestion.label}</span>
+                  {suggestion.properties.postcode && (
+                    <span className={styles.suggestionPostcode}>
+                      {suggestion.properties.postcode}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

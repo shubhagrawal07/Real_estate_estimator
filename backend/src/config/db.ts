@@ -13,6 +13,7 @@ import { PropertyFeature } from '../modules/property-estimate/entities/property-
 import { User } from '../modules/user/user.model';
 import { Zone } from '../modules/zone/zone.model';
 import { Subscription } from '../modules/subscription/subscription.model';
+import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
 import { config } from './env';
 
 export const AppDataSource = new DataSource({
@@ -37,6 +38,7 @@ export const AppDataSource = new DataSource({
     PropertyFeature,
     Zone,
     Subscription,
+    CityBlockSalesData,
   ],
   synchronize: config.nodeEnv !== 'production',
 });
