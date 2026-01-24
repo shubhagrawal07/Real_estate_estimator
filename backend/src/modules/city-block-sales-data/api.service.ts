@@ -3,10 +3,9 @@
  * Handles fetching data from the DVF OpenData API with pagination support
  */
 
+import { config } from '../../config/env';
 import { ApiResponse, FetchDataParams, SalesDataRecord } from './types';
 import { processResults } from './data-processor.service';
-
-const BASE_URL = 'https://apidf-preprod.cerema.fr/dvf_opendata/mutations/';
 
 // ============================================================================
 // URL Building
@@ -14,7 +13,7 @@ const BASE_URL = 'https://apidf-preprod.cerema.fr/dvf_opendata/mutations/';
 
 /**
  * Builds API URL with query parameters
- * 
+ *
  * @param anneemut_min - Minimum mutation year
  * @param anneemut_max - Maximum mutation year
  * @param code_insee - INSEE code (municipality identifier)
@@ -33,8 +32,8 @@ function buildApiUrl(
     code_insee: code_insee,
     page: page.toString(),
   });
-
-  return `${BASE_URL}?${params.toString()}`;
+  const base = config.dvf.baseUrl.replace(/\/?$/, '');
+  return `${base}?${params.toString()}`;
 }
 
 // ============================================================================
@@ -42,27 +41,61 @@ function buildApiUrl(
 // ============================================================================
 
 /**
- * Fetches data from a specific API URL
- * 
+ * Fetches data from a specific API URL with timeout and improved error handling.
+ *
  * @param url - Complete API URL to fetch from
  * @returns API response data
- * @throws Error if API request fails
+ * @throws Error if API request fails, times out, or response is invalid
  */
 async function fetchApiData(url: string): Promise<ApiResponse> {
+  const timeoutMs = config.dvf.timeoutMs;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'RealEstateEstimator/1.0 (https://github.com)',
+      },
+    });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
+      const text = await response.text();
+      const snippet = text.length > 300 ? `${text.slice(0, 300)}...` : text;
       throw new Error(
-        `API request failed: ${response.status} ${response.statusText}`
+        `DVF API error ${response.status} ${response.statusText}. Body: ${snippet}`
       );
     }
 
-    const data = (await response.json()) as ApiResponse;
+    let data: ApiResponse;
+    try {
+      data = (await response.json()) as ApiResponse;
+    } catch (e) {
+      throw new Error(
+        `DVF API returned invalid JSON: ${e instanceof Error ? e.message : 'parse error'}`
+      );
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error('DVF API response is not an object');
+    }
+    if (!Array.isArray(data.results)) {
+      throw new Error(
+        `DVF API response missing or invalid "results" array (got ${typeof data.results})`
+      );
+    }
     return data;
   } catch (error) {
+    clearTimeout(timeoutId);
     if (error instanceof Error) {
-      throw new Error(`Failed to fetch data from API: ${error.message}`);
+      if (error.name === 'AbortError') {
+        throw new Error(
+          `Request to DVF API timed out after ${timeoutMs / 1000}s. The DVF service may be slow or unreachable. Check DVF_API_BASE_URL and DVF_API_TIMEOUT_MS.`
+        );
+      }
+      throw new Error(`Failed to fetch from DVF API: ${error.message}`);
     }
     throw error;
   }

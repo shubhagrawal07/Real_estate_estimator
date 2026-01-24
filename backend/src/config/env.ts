@@ -20,4 +20,8 @@ export const config = {
   jwt: {
     secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
   },
+  dvf: {
+    baseUrl: process.env.DVF_API_BASE_URL || 'https://apidf-preprod.cerema.fr/dvf_opendata/mutations/',
+    timeoutMs: parseInt(process.env.DVF_API_TIMEOUT_MS || '90000', 10),
+  },
 };

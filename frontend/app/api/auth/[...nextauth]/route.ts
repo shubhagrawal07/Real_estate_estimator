@@ -31,6 +31,7 @@ export const authOptions: NextAuthOptions = {
             // Store the JWT token in the user object
             (user as any).backendToken = data.token;
             (user as any).backendUserId = data.user.userId;
+            (user as any).backendUserRole = data.user.role;
             return true;
           }
         } catch (error) {
@@ -52,6 +53,7 @@ export const authOptions: NextAuthOptions = {
         if ((user as any).backendToken) {
           token.backendToken = (user as any).backendToken;
           token.backendUserId = (user as any).backendUserId;
+          token.backendUserRole = (user as any).backendUserRole;
         }
       }
       return token;
@@ -72,6 +74,7 @@ export const authOptions: NextAuthOptions = {
         if (token.backendToken) {
           (session as any).backendToken = token.backendToken;
           (session as any).backendUserId = token.backendUserId;
+          (session as any).userRole = token.backendUserRole;
         }
       }
       return session;

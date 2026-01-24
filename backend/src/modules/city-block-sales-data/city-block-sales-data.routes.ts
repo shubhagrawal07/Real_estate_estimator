@@ -6,12 +6,15 @@
 import { Router, Request, Response } from 'express';
 import { processRealEstateData } from './city-block-sales-data.service';
 import { FetchDataParams } from './types';
+import { authenticateToken, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { UserRole } from '../user/user.model';
 
 const router = Router();
 
 /**
  * POST /process-data
  * Processes real estate data from DVF API and saves to database
+ * Requires admin authentication
  * 
  * Request Body:
  * {
@@ -23,11 +26,19 @@ const router = Router();
  * Response:
  * {
  *   success: boolean,
- *   recordsCount: number,
+ *   totalRecords: number,
+ *   savedRecords: number,
  *   message: string
  * }
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  // Check if user is admin
+  if (req.userRole !== UserRole.ADMIN) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin role required.',
+    });
+  }
   try {
     const { anneemut_min, anneemut_max, code_insee } = req.body;
 
@@ -62,12 +73,13 @@ router.post('/', async (req: Request, res: Response) => {
       code_insee,
     };
 
-    const records = await processRealEstateData(params);
+    const { totalRecords, savedRecords } = await processRealEstateData(params);
 
     // Return success response
     res.json({
       success: true,
-      recordsCount: records.length,
+      totalRecords,
+      savedRecords,
       message: 'Data processed and saved to database successfully',
     });
   } catch (error) {

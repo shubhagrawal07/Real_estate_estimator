@@ -38,19 +38,20 @@ function extractDateString(date: Date | string): string {
  * Saves processed data to the database
  * Only saves records with date > max date for this code_insee
  * If no data exists for this code_insee, saves all records
- * 
+ *
  * @param records - Array of sales data records to save
  * @param codeInsee - INSEE code for filtering
+ * @returns Number of records actually saved to the database
  */
 async function saveToDatabase(
   records: SalesDataRecord[],
   codeInsee: string
-): Promise<void> {
+): Promise<number> {
   const repo = new CityBlockSalesDataRepo();
 
   if (records.length === 0) {
     console.log('[DB] No records to save');
-    return;
+    return 0;
   }
 
   // Get maximum date for this code_insee
@@ -81,8 +82,10 @@ async function saveToDatabase(
     console.log(`[DB] Saving ${recordsToSave.length} records...`);
     await repo.insertMany(recordsToSave);
     console.log('[DB] ✅ Records saved successfully');
+    return recordsToSave.length;
   } else {
     console.log('[DB] No new records to save (all dates <= max date)');
+    return 0;
   }
 }
 
@@ -90,20 +93,25 @@ async function saveToDatabase(
 // Main Service Function
 // ============================================================================
 
+export interface ProcessRealEstateDataResult {
+  totalRecords: number;
+  savedRecords: number;
+}
+
 /**
  * Main service function that fetches and processes real estate data
- * 
+ *
  * Process:
  * 1. Fetches data from API with pagination
  * 2. Processes and filters records (apartments/maisons only)
  * 3. Saves to database (only records with date > max date for code_insee)
- * 
+ *
  * @param params - Fetch parameters (anneemut_min, anneemut_max, code_insee)
- * @returns Array of all processed records
+ * @returns { totalRecords, savedRecords }
  */
 export async function processRealEstateData(
   params: FetchDataParams
-): Promise<SalesDataRecord[]> {
+): Promise<ProcessRealEstateDataResult> {
   const { anneemut_min, anneemut_max, code_insee } = params;
 
   console.log('[Service] Starting real estate data processing', {
@@ -119,15 +127,19 @@ export async function processRealEstateData(
       code_insee,
     });
 
+    const totalRecords = records.length;
     console.log('[Service] Data processing completed', {
-      total_records: records.length,
+      total_records: totalRecords,
     });
 
     // Step 2: Save to database with date validation
-    await saveToDatabase(records, code_insee);
+    const savedRecords = await saveToDatabase(records, code_insee);
 
-    console.log('[Service] ✅ Processing completed successfully');
-    return records;
+    console.log('[Service] ✅ Processing completed successfully', {
+      totalRecords,
+      savedRecords,
+    });
+    return { totalRecords, savedRecords };
   } catch (error) {
     console.error('[Service] ❌ Error processing real estate data:', error);
     throw error;

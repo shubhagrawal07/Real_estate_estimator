@@ -66,10 +66,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
+  // Get user role from session
+  const userRole = (session as any)?.userRole || (session as any)?.backendUserRole;
+
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠' },
     { path: '/getEstimates', label: 'Get Estimates', icon: '📊' },
     { path: '/myEstimates', label: 'My Estimates', icon: '📋' },
+    // Admin-only items
+    ...(userRole === 'admin' ? [
+      { path: '/fetchSalesData', label: 'Fetch sales data', icon: '📥' },
+    ] : []),
   ];
 
   const isActive = (path: string) => {
