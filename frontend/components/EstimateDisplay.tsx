@@ -58,7 +58,11 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
         {/* Estimated Value Section */}
         <div className={styles.priceSection}>
           <div className={styles.priceLabel}>Estimated Property Value</div>
-          <div className={styles.priceValue}>{formatPrice(estimate.estimatedPrice)}</div>
+          <div className={styles.priceValue}>
+            {estimate.estimatedPrice
+              ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+              : 'N/A'}
+          </div>
           <div className={styles.priceSubtext}>
             Calculated on {formatDate(estimate.createdDate)}
           </div>

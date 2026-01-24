@@ -53,7 +53,9 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
       <div className={styles.resultHeader}>
         <h2>Estimated Market Value</h2>
         <div className={styles.price}>
-          {estimate.estimatedPrice ? formatPrice(estimate.estimatedPrice) : 'Calculating...'}
+          {estimate.estimatedPrice
+            ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+            : 'Calculating...'}
         </div>
       </div>
 
