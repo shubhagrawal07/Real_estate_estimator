@@ -3,14 +3,6 @@ import { AppDataSource } from '../../config/db';
 import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge } from './property-estimate.model';
 import { ApartmentDetails, OutdoorSpace } from './entities/apartment-details.model';
 import { HouseDetails, PoolOption } from './entities/house-details.model';
-import { PropertyCriteria } from './entities/property-criteria.model';
-import { PropertyAmenity } from './entities/property-amenity.model';
-import { PropertyParking } from './entities/property-parking.model';
-import { PropertyFeature } from './entities/property-feature.model';
-import { Criteria } from './entities/criteria.model';
-import { Amenity } from './entities/amenity.model';
-import { ParkingType } from './entities/parking-type.model';
-import { Feature } from './entities/feature.model';
 import { CreatePropertyEstimateDto } from './property-estimate.service';
 
 export class PropertyEstimateRepo {
@@ -56,10 +48,41 @@ export class PropertyEstimateRepo {
       ...estimateData
     } = data;
 
-    // Create the main PropertyEstimate entity
+    // Build arrays of codes for JSON columns
+    const criteriaCodes: string[] = [];
+    if (criteriaCalm) criteriaCodes.push('calm');
+    if (criteriaBright) criteriaCodes.push('bright');
+    if (criteriaNearAmenities) criteriaCodes.push('near_amenities');
+    if (criteriaNoVisAvis) criteriaCodes.push('no_vis_a_vis');
+    if (criteriaWellConnected) criteriaCodes.push('well_connected');
+
+    const amenityCodes: string[] = [];
+    if (amenityAirConditioning) amenityCodes.push('air_conditioning');
+    if (amenityModernBathroom) amenityCodes.push('modern_bathroom');
+    if (amenityRecentKitchen) amenityCodes.push('recent_kitchen');
+    if (amenityFireplace) amenityCodes.push('fireplace');
+    if (amenityElectricityStandard) amenityCodes.push('electricity_standard');
+    if (amenityDoubleTripleGlazing) amenityCodes.push('double_triple_glazing');
+
+    const featureCodes: string[] = [];
+    if (doubleLivingRoom) featureCodes.push('double_living_room');
+    if (openKitchen) featureCodes.push('open_kitchen');
+    if (laundryCellar) featureCodes.push('laundry_cellar');
+
+    const parkingCodes: string[] = [];
+    if (parkingGarage) parkingCodes.push('garage');
+    if (parkingPrivate) parkingCodes.push('private');
+    if (parkingShared) parkingCodes.push('shared');
+    if (parkingStreet) parkingCodes.push('street');
+
+    // Create the main PropertyEstimate entity with JSON columns
     const estimate = this.repository.create({
       ...estimateData,
       buildingAge: buildingAge,
+      criteria: criteriaCodes,
+      amenities: amenityCodes,
+      features: featureCodes,
+      parking: parkingCodes,
     });
     const savedEstimate = await this.repository.save(estimate);
 
@@ -84,104 +107,10 @@ export class PropertyEstimateRepo {
       await houseDetailsRepo.save(houseDetails);
     }
 
-    // Create PropertyCriteria entries
-    const criteriaRepo = AppDataSource.getRepository(Criteria);
-    const propertyCriteriaRepo = AppDataSource.getRepository(PropertyCriteria);
-    const criteriaMapping: { [key: string]: string } = {
-      criteriaCalm: 'calm',
-      criteriaBright: 'bright',
-      criteriaNearAmenities: 'near_amenities',
-      criteriaNoVisAvis: 'no_vis_a_vis',
-      criteriaWellConnected: 'well_connected',
-    };
-
-    for (const [field, code] of Object.entries(criteriaMapping)) {
-      if (data[field as keyof CreatePropertyEstimateDto]) {
-        const criteria = await criteriaRepo.findOne({ where: { code } });
-        if (criteria) {
-          const propertyCriteria = propertyCriteriaRepo.create({
-            propertyId: savedEstimate.propertyId,
-            criteriaId: criteria.id,
-          });
-          await propertyCriteriaRepo.save(propertyCriteria);
-        }
-      }
-    }
-
-    // Create PropertyAmenity entries
-    const amenityRepo = AppDataSource.getRepository(Amenity);
-    const propertyAmenityRepo = AppDataSource.getRepository(PropertyAmenity);
-    const amenityMapping: { [key: string]: string } = {
-      amenityAirConditioning: 'air_conditioning',
-      amenityModernBathroom: 'modern_bathroom',
-      amenityRecentKitchen: 'recent_kitchen',
-      amenityFireplace: 'fireplace',
-      amenityElectricityStandard: 'electricity_standard',
-      amenityDoubleTripleGlazing: 'double_triple_glazing',
-    };
-
-    for (const [field, code] of Object.entries(amenityMapping)) {
-      if (data[field as keyof CreatePropertyEstimateDto]) {
-        const amenity = await amenityRepo.findOne({ where: { code } });
-        if (amenity) {
-          const propertyAmenity = propertyAmenityRepo.create({
-            propertyId: savedEstimate.propertyId,
-            amenityId: amenity.id,
-          });
-          await propertyAmenityRepo.save(propertyAmenity);
-        }
-      }
-    }
-
-    // Create PropertyParking entries
-    const parkingTypeRepo = AppDataSource.getRepository(ParkingType);
-    const propertyParkingRepo = AppDataSource.getRepository(PropertyParking);
-    const parkingMapping: { [key: string]: string } = {
-      parkingGarage: 'garage',
-      parkingPrivate: 'private',
-      parkingShared: 'shared',
-      parkingStreet: 'street',
-    };
-
-    for (const [field, code] of Object.entries(parkingMapping)) {
-      if (data[field as keyof CreatePropertyEstimateDto]) {
-        const parkingType = await parkingTypeRepo.findOne({ where: { code } });
-        if (parkingType) {
-          const propertyParking = propertyParkingRepo.create({
-            propertyId: savedEstimate.propertyId,
-            parkingTypeId: parkingType.id,
-          });
-          await propertyParkingRepo.save(propertyParking);
-        }
-      }
-    }
-
-    // Create PropertyFeature entries
-    const featureRepo = AppDataSource.getRepository(Feature);
-    const propertyFeatureRepo = AppDataSource.getRepository(PropertyFeature);
-    const featureMapping: { [key: string]: string } = {
-      doubleLivingRoom: 'double_living_room',
-      openKitchen: 'open_kitchen',
-      laundryCellar: 'laundry_cellar',
-    };
-
-    for (const [field, code] of Object.entries(featureMapping)) {
-      if (data[field as keyof CreatePropertyEstimateDto]) {
-        const feature = await featureRepo.findOne({ where: { code } });
-        if (feature) {
-          const propertyFeature = propertyFeatureRepo.create({
-            propertyId: savedEstimate.propertyId,
-            featureId: feature.id,
-          });
-          await propertyFeatureRepo.save(propertyFeature);
-        }
-      }
-    }
-
     // Return the estimate with relations loaded
     const estimateWithRelations = await this.repository.findOne({
       where: { propertyId: savedEstimate.propertyId },
-      relations: ['apartmentDetails', 'houseDetails', 'propertyCriteria', 'propertyAmenities', 'propertyParking', 'propertyFeatures'],
+      relations: ['apartmentDetails', 'houseDetails'],
     });
     
     if (!estimateWithRelations) {
@@ -193,7 +122,7 @@ export class PropertyEstimateRepo {
 
   async findAll(): Promise<PropertyEstimate[]> {
     return this.repository.find({
-      relations: ['apartmentDetails', 'houseDetails', 'propertyCriteria', 'propertyAmenities', 'propertyParking', 'propertyFeatures'],
+      relations: ['apartmentDetails', 'houseDetails'],
       order: { createdDate: 'DESC' },
     });
   }
@@ -201,14 +130,14 @@ export class PropertyEstimateRepo {
   async findOne(id: string): Promise<PropertyEstimate | null> {
     return this.repository.findOne({
       where: { propertyId: id },
-      relations: ['apartmentDetails', 'houseDetails', 'propertyCriteria', 'propertyAmenities', 'propertyParking', 'propertyFeatures'],
+      relations: ['apartmentDetails', 'houseDetails'],
     });
   }
 
   async findByUserId(userId: string): Promise<PropertyEstimate[]> {
     return this.repository.find({
       where: { userId },
-      relations: ['apartmentDetails', 'houseDetails', 'propertyCriteria', 'propertyAmenities', 'propertyParking', 'propertyFeatures'],
+      relations: ['apartmentDetails', 'houseDetails'],
       order: { createdDate: 'DESC' },
     });
   }
@@ -257,6 +186,17 @@ export class PropertyEstimateRepo {
       return null;
     }
 
+    estimate.estimatedPrice = estimatedPrice;
+    return this.repository.save(estimate);
+  }
+
+  async updatePrice(propertyId: string, basePricePerSqM: number, estimatedPrice: number): Promise<PropertyEstimate | null> {
+    const estimate = await this.findOne(propertyId);
+    if (!estimate) {
+      return null;
+    }
+
+    estimate.basePricePerSqM = basePricePerSqM;
     estimate.estimatedPrice = estimatedPrice;
     return this.repository.save(estimate);
   }

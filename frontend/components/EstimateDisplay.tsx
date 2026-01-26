@@ -20,6 +20,7 @@ interface PropertyEstimate {
   deadline: string;
   condition?: string;
   estimatedPrice?: number;
+  basePricePerSqM?: number;
   status: string;
   createdDate: string;
 }
@@ -94,6 +95,12 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
               <span className={styles.summaryLabel}>Area</span>
               <span className={styles.summaryValue}>{estimate.area} m²</span>
             </div>
+            {estimate.basePricePerSqM && (
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Price per m²</span>
+                <span className={styles.summaryValue}>{formatPrice(Math.round(estimate.basePricePerSqM))}</span>
+              </div>
+            )}
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Bedrooms</span>
               <span className={styles.summaryValue}>{estimate.bedrooms}</span>

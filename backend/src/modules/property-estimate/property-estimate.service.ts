@@ -4,6 +4,13 @@ import { combineLocationCode, parseLocationCode } from './utils/location-code.ut
 import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
 import { OutdoorSpace } from './entities/apartment-details.model';
 import { PoolOption } from './entities/house-details.model';
+import {
+  CRITERIA_PRICE_IMPACTS,
+  AMENITY_PRICE_IMPACTS,
+  FEATURE_PRICE_IMPACTS,
+  PARKING_PRICE_IMPACTS,
+  calculateTotalPriceImpact,
+} from './constants/price-impact-factors';
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -57,10 +64,11 @@ export class PropertyEstimateService {
   }
 
   async createEstimate(dto: CreatePropertyEstimateDto, userId?: string): Promise<PropertyEstimate> {
-    const estimatedPrice = await this.calculatePrice(dto);
+    const { basePricePerSqM, estimatedPrice } = await this.calculatePrice(dto);
 
     return this.repo.createWithRelations({
       ...dto,
+      basePricePerSqM,
       estimatedPrice,
       impressions: 0,
       status: userId ? PropertyStatus.NEW : PropertyStatus.DRAFT,
@@ -68,7 +76,7 @@ export class PropertyEstimateService {
     });
   }
 
-  private async calculatePrice(dto: CreatePropertyEstimateDto): Promise<number> {
+  private async calculatePrice(dto: CreatePropertyEstimateDto): Promise<{ basePricePerSqM: number; estimatedPrice: number }> {
     // Try segment-based valuation (36 months, sbati segments, weighted formula) first
     let basePricePerSqM = await this.getPricePerSqMFromSegmentValuation(
       dto.locationCode,
@@ -84,75 +92,81 @@ export class PropertyEstimateService {
     // If no sales data found, fall back to default pricing
     if (!basePricePerSqM) {
       basePricePerSqM = 2000; // Base price per square meter
-
-      // Extract department from location code for location-based pricing
-      const locationParts = parseLocationCode(dto.locationCode);
-      const department = locationParts?.department || '';
-      
-      // Department-based pricing multiplier
-      const locationMultiplier = this.getLocationMultiplier(department);
-      basePricePerSqM *= locationMultiplier;
     }
 
     basePricePerSqM *= 0.90;
-    
+
+    // Save the basePricePerSqM value (this is what we'll store in the database)
+    const savedBasePricePerSqM = basePricePerSqM;
+
+    // Calculate price impacts from criteria, amenities, features, and parking
+    const criteriaCodes: string[] = [];
+    if (dto.criteriaCalm) criteriaCodes.push('calm');
+    if (dto.criteriaBright) criteriaCodes.push('bright');
+    if (dto.criteriaNearAmenities) criteriaCodes.push('near_amenities');
+    if (dto.criteriaNoVisAvis) criteriaCodes.push('no_vis_a_vis');
+    if (dto.criteriaWellConnected) criteriaCodes.push('well_connected');
+
+    const amenityCodes: string[] = [];
+    if (dto.amenityAirConditioning) amenityCodes.push('air_conditioning');
+    if (dto.amenityModernBathroom) amenityCodes.push('modern_bathroom');
+    if (dto.amenityRecentKitchen) amenityCodes.push('recent_kitchen');
+    if (dto.amenityFireplace) amenityCodes.push('fireplace');
+    if (dto.amenityElectricityStandard) amenityCodes.push('electricity_standard');
+    if (dto.amenityDoubleTripleGlazing) amenityCodes.push('double_triple_glazing');
+
+    const featureCodes: string[] = [];
+    if (dto.doubleLivingRoom) featureCodes.push('double_living_room');
+    if (dto.openKitchen) featureCodes.push('open_kitchen');
+    if (dto.laundryCellar) featureCodes.push('laundry_cellar');
+
+    const parkingCodes: string[] = [];
+    if (dto.parkingGarage) parkingCodes.push('garage');
+    if (dto.parkingPrivate) parkingCodes.push('private');
+    if (dto.parkingShared) parkingCodes.push('shared');
+    if (dto.parkingStreet) parkingCodes.push('street');
+
+    // Calculate total price impact percentage
+    const criteriaImpact = calculateTotalPriceImpact(criteriaCodes, CRITERIA_PRICE_IMPACTS);
+    const amenityImpact = calculateTotalPriceImpact(amenityCodes, AMENITY_PRICE_IMPACTS);
+    const featureImpact = calculateTotalPriceImpact(featureCodes, FEATURE_PRICE_IMPACTS);
+    const parkingImpact = calculateTotalPriceImpact(parkingCodes, PARKING_PRICE_IMPACTS);
+
+    const totalPriceImpactPercent = criteriaImpact + amenityImpact + featureImpact + parkingImpact;
+    const priceMultiplier = 1 + totalPriceImpactPercent / 100;
 
     // Bedroom multiplier
     const bedroomMultiplier = 1 + (dto.bedrooms - 2) * 0.1;
     
     // Bathroom multiplier
-    const bathroomMultiplier = 1 + (dto.bathrooms - 1.5) * 0.15;
+    // const bathroomMultiplier = 1 + (dto.bathrooms - 1.5) * 0.15;
 
-    // Floor multiplier (more floors can add value)
-    const floorMultiplier = 1 + (dto.floors - 1) * 0.05;
+    // Apartment floor multiplier (only for apartments)
+    const apartmentFloorMultiplier = this.getApartmentFloorMultiplier(
+      dto.type,
+      dto.apartmentElevator,
+      dto.apartmentFloor
+    );
 
-    // Feature multipliers
-    const balconyMultiplier = dto.hasBalcony ? 1.1 : 1.0;
-    const parkingMultiplier = dto.hasParking ? 1.15 : 1.0;
-
-    // Ownership and deadline multipliers
-    const ownershipMultiplier = dto.ownershipType === OwnershipType.OWNER ? 1.0 : 0.95;
-    const deadlineMultiplier = dto.deadline === Deadline.IMMEDIATE ? 0.98 : 1.0;
 
     // Condition multiplier
     const conditionMultiplier = this.getConditionMultiplier(dto.condition);
 
-    const estimatedPrice =
-      dto.area *
-      basePricePerSqM *
+    // Apply multipliers after basePricePerSqM * area
+    const basePrice = savedBasePricePerSqM * dto.area;
+    const estimatedPrice = Math.round(
+      basePrice *
+      priceMultiplier *
       bedroomMultiplier *
-      bathroomMultiplier *
-      floorMultiplier *
-      balconyMultiplier *
-      parkingMultiplier *
-      ownershipMultiplier *
-      deadlineMultiplier *
-      conditionMultiplier;
+      // bathroomMultiplier *
+      apartmentFloorMultiplier *
+      conditionMultiplier
+    );
 
-    // const estimatedPrice =
-    //   dto.area *
-    //   basePricePerSqM;
-
-    return Math.round(estimatedPrice);
-  }
-
-  private getLocationMultiplier(department: string): number {
-    // Simplified location-based pricing using department code
-    // Department codes: 75=Paris, 69=Lyon, 13=Marseille, 31=Toulouse, 06=Nice, 44=Nantes, 67=Strasbourg, 34=Montpellier, 33=Bordeaux, 59=Lille
-    const locationMultipliers: { [key: string]: number } = {
-      '75': 2.5,  // Paris
-      '69': 1.8,  // Lyon
-      '13': 1.6,  // Marseille
-      '31': 1.4,  // Toulouse
-      '06': 1.9,  // Nice
-      '44': 1.5,  // Nantes
-      '67': 1.3,  // Strasbourg
-      '34': 1.4,  // Montpellier
-      '33': 1.6,  // Bordeaux
-      '59': 1.2,  // Lille
+    return {
+      basePricePerSqM: savedBasePricePerSqM,
+      estimatedPrice,
     };
-
-    return locationMultipliers[department] || 1.0;
   }
 
   // --- Segment-based valuation (36 months, sbati segments, weighted formula) ---
@@ -414,14 +428,68 @@ export class PropertyEstimateService {
     if (!condition) return 1.0;
     
     const conditionMultipliers: { [key: string]: number } = {
-      'excellent': 1.2,
-      'good': 1.0,
+      'excellent': 1.12,
+      'good': 0.0,
       'fair': 0.85,
       'poor': 0.7,
-      'needs renovation': 0.6,
+      'needs renovation': 0.88,
     };
 
     return conditionMultipliers[condition.toLowerCase()] || 1.0;
+  }
+
+  /**
+   * Get apartment floor multiplier based on floor number and elevator availability
+   * Only applies to apartments
+   * @param propertyType - Property type (APARTMENT or HOUSE)
+   * @param hasElevator - Whether the apartment has an elevator
+   * @param floorNumber - Floor number (0th, 1st, 2nd, 3rd or higher)
+   * @returns Multiplier value (0.0 for 0th floor, or based on floor and elevator)
+   */
+  private getApartmentFloorMultiplier(
+    propertyType: PropertyType,
+    hasElevator?: boolean | null,
+    floorNumber?: number | null
+  ): number {
+    // Only apply to apartments
+    if (propertyType !== PropertyType.APARTMENT) {
+      return 1.0;
+    }
+
+    // If floor number is not provided or is null, default to 1.0 (no multiplier)
+    if (floorNumber === null || floorNumber === undefined) {
+      return 1.0;
+    }
+
+    // 0th floor always has 0.0 multiplier
+    if (floorNumber === 0) {
+      return 0.0;
+    }
+
+    const hasElevatorValue = hasElevator === true;
+
+    if (!hasElevatorValue) {
+      // Apartment WITHOUT elevator
+      if (floorNumber === 1) {
+        return 0.99;
+      } else if (floorNumber === 2) {
+        return 0.97;
+      } else if (floorNumber >= 3) {
+        return 0.92;
+      }
+    } else {
+      // Apartment WITH elevator
+      if (floorNumber === 1) {
+        return 1.01;
+      } else if (floorNumber === 2) {
+        return 1.02;
+      } else if (floorNumber >= 3) {
+        return 1.04;
+      }
+    }
+
+    // Default fallback (should not reach here, but just in case)
+    return 1.0;
   }
 
   async findAll(): Promise<PropertyEstimate[]> {
@@ -439,6 +507,7 @@ export class PropertyEstimateService {
     }
 
     // Convert estimate to DTO format for price calculation
+    // Map JSON arrays back to boolean fields for DTO
     const dto: CreatePropertyEstimateDto = {
       address: estimate.address,
       locationCode: estimate.locationCode,
@@ -453,12 +522,42 @@ export class PropertyEstimateService {
       ownershipType: estimate.ownershipType,
       deadline: estimate.deadline,
       condition: estimate.condition,
+      // Map criteria codes to boolean fields
+      criteriaCalm: estimate.criteria?.includes('calm') || false,
+      criteriaBright: estimate.criteria?.includes('bright') || false,
+      criteriaNearAmenities: estimate.criteria?.includes('near_amenities') || false,
+      criteriaNoVisAvis: estimate.criteria?.includes('no_vis_a_vis') || false,
+      criteriaWellConnected: estimate.criteria?.includes('well_connected') || false,
+      // Map amenity codes to boolean fields
+      amenityAirConditioning: estimate.amenities?.includes('air_conditioning') || false,
+      amenityModernBathroom: estimate.amenities?.includes('modern_bathroom') || false,
+      amenityRecentKitchen: estimate.amenities?.includes('recent_kitchen') || false,
+      amenityFireplace: estimate.amenities?.includes('fireplace') || false,
+      amenityElectricityStandard: estimate.amenities?.includes('electricity_standard') || false,
+      amenityDoubleTripleGlazing: estimate.amenities?.includes('double_triple_glazing') || false,
+      // Map feature codes to boolean fields
+      doubleLivingRoom: estimate.features?.includes('double_living_room') || false,
+      openKitchen: estimate.features?.includes('open_kitchen') || false,
+      laundryCellar: estimate.features?.includes('laundry_cellar') || false,
+      // Map parking codes to boolean fields
+      parkingGarage: estimate.parking?.includes('garage') || false,
+      parkingPrivate: estimate.parking?.includes('private') || false,
+      parkingShared: estimate.parking?.includes('shared') || false,
+      parkingStreet: estimate.parking?.includes('street') || false,
+      // Map apartment-specific fields
+      apartmentElevator: estimate.apartmentDetails?.hasElevator || null,
+      apartmentFloor: estimate.apartmentDetails?.floorNumber ?? null,
+      outdoorSpace: estimate.apartmentDetails?.outdoorSpace,
+      // Map house-specific fields
+      landSize: estimate.houseDetails?.landSize ?? null,
+      semiDetached: estimate.houseDetails?.semiDetached ?? null,
+      poolOption: estimate.houseDetails?.poolOption,
     };
 
-    const newEstimatedPrice = await this.calculatePrice(dto);
+    const { basePricePerSqM, estimatedPrice } = await this.calculatePrice(dto);
     
-    // Update only the estimated price
-    return this.repo.updateEstimatedPrice(propertyId, newEstimatedPrice);
+    // Update both basePricePerSqM and estimated price
+    return this.repo.updatePrice(propertyId, basePricePerSqM, estimatedPrice);
   }
 
   async deleteEstimate(propertyId: string): Promise<boolean> {

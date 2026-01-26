@@ -1,9 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, OneToMany, OneToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import type { User } from '../user/user.model';
-import type { PropertyCriteria } from './entities/property-criteria.model';
-import type { PropertyAmenity } from './entities/property-amenity.model';
-import type { PropertyParking } from './entities/property-parking.model';
-import type { PropertyFeature } from './entities/property-feature.model';
 import type { ApartmentDetails } from './entities/apartment-details.model';
 import type { HouseDetails } from './entities/house-details.model';
 
@@ -66,6 +62,9 @@ export class PropertyEstimate {
   @Column({ name: 'estimated_price', type: 'int', nullable: true })
   estimatedPrice?: number;
 
+  @Column({ name: 'base_price_per_sqm', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  basePricePerSqM?: number; // Base price per square meter (after 0.90 multiplier, before other multipliers)
+
   @CreateDateColumn({ name: 'created_date' })
   createdDate!: Date;
 
@@ -104,25 +103,25 @@ export class PropertyEstimate {
   @Column({ name: 'has_parking', type: 'boolean', default: false })
   hasParking!: boolean;
 
+  // Store criteria, amenities, features, and parking as JSON arrays of codes
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'" })
+  criteria!: string[]; // Array of criteria codes (e.g., ['calm', 'bright', 'well_connected'])
+
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'" })
+  amenities!: string[]; // Array of amenity codes (e.g., ['air_conditioning', 'modern_bathroom'])
+
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'" })
+  features!: string[]; // Array of feature codes (e.g., ['double_living_room', 'open_kitchen'])
+
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'" })
+  parking!: string[]; // Array of parking codes (e.g., ['garage', 'private'])
+
   // Type-specific details (3NF normalization)
   @OneToOne('ApartmentDetails', 'property', { nullable: true })
   apartmentDetails?: ApartmentDetails;
 
   @OneToOne('HouseDetails', 'property', { nullable: true })
   houseDetails?: HouseDetails;
-
-  // Feature relationships (3NF)
-  @OneToMany('PropertyCriteria', 'property')
-  propertyCriteria!: PropertyCriteria[];
-
-  @OneToMany('PropertyAmenity', 'property')
-  propertyAmenities!: PropertyAmenity[];
-
-  @OneToMany('PropertyParking', 'property')
-  propertyParking!: PropertyParking[];
-
-  @OneToMany('PropertyFeature', 'property')
-  propertyFeatures!: PropertyFeature[];
 
   @Column({
     name: 'ownership_type',

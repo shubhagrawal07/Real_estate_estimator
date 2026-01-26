@@ -24,6 +24,7 @@ interface PropertyEstimate {
   deadline: string;
   condition?: string;
   estimatedPrice?: number;
+  basePricePerSqM?: number;
   status: string;
   createdDate: string;
 }
