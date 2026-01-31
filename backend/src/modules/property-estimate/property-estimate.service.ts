@@ -299,14 +299,24 @@ export class PropertyEstimateService {
     const start36 = m(36);
     const split18 = m(18);
 
-    // 1) Fetch last 36 months with exact idpar
+    // 1) Fetch last 36 months - try exact idpar first, then expand to prefixes if no records
     let all = await this.fetchGroupRecords(locationCode, false, dvtType, start36, end36);
     if (all.length === 0) {
-      console.log('[Valuation] No records for idpar=%s type=%s over 36 months, skipping segment valuation', locationCode, dvtType);
-      return null;
+      const prefixesForInitial = this.getIdparPrefixes(locationCode);
+      for (const pre of prefixesForInitial) {
+        all = await this.fetchGroupRecords(pre, true, dvtType, start36, end36);
+        if (all.length > 0) {
+          console.log('[Valuation] No exact idpar records; expanded to prefix=%s: %d records (36 months)', pre, all.length);
+          break;
+        }
+      }
+      if (all.length === 0) {
+        console.log('[Valuation] No records for idpar=%s type=%s over 36 months (tried all prefixes), skipping segment valuation', locationCode, dvtType);
+        return null;
+      }
+    } else {
+      console.log('[Valuation] idpar=%s type=%s sbati=%s | raw fetch: %d records (36 months)', locationCode, dvtType, sbati, all.length);
     }
-
-    console.log('[Valuation] idpar=%s type=%s sbati=%s | raw fetch: %d records (36 months)', locationCode, dvtType, sbati, all.length);
 
     const bounds = this.getSegmentBounds(sbati);
 
@@ -339,27 +349,48 @@ export class PropertyEstimateService {
     logGroup('New data (latest 18 months)', group1, split18, end36);
     logGroup('Old data (older 18 months)', group2, start36, endGroup2);
 
+    const minPerSeg = PropertyEstimateService.MIN_RECORDS_PER_SEGMENT;
+    const { A: a1, B: b1, C: c1, D: d1 } = this.assignToSegments(group1, bounds);
+    const { A: a2, B: b2, C: c2, D: d2 } = this.assignToSegments(group2, bounds);
+    const needExpand1 = a1.length < minPerSeg || b1.length < minPerSeg || c1.length < minPerSeg || d1.length < minPerSeg;
+    const needExpand2 = a2.length < minPerSeg || b2.length < minPerSeg || c2.length < minPerSeg || d2.length < minPerSeg;
+    if (needExpand1 || needExpand2) {
+      console.log('[Valuation] Some segments have <%d records; expanding to idpar prefixes (need ≥%d per A,B,C,D)', minPerSeg, minPerSeg);
+    }
+
     const prefixes = this.getIdparPrefixes(locationCode);
 
     const tryBase = async (
       group: { sbati: number; price: number }[],
       start: Date,
-      end: Date
+      end: Date,
+      groupLabel: string
     ): Promise<number | null> => {
       let base = this.basePriceFromSegments(group, bounds);
-      if (base != null) return base;
+      if (base != null) {
+        const { A, B, C, D } = this.assignToSegments(group, bounds);
+        console.log('[Valuation] %s: exact idpar sufficient | count=%d | segments A=%d B=%d C=%d D=%d ✓', groupLabel, group.length, A.length, B.length, C.length, D.length);
+        return base;
+      }
 
+      // Exact idpar has insufficient segments (need ≥5 per A,B,C,D); expand to next prefix
       for (const pre of prefixes) {
         const fetched = await this.fetchGroupRecords(pre, true, dvtType, start, end);
         const asObj = fetched.map((r) => ({ sbati: Number(r.sbati), price: Number(r.price) }));
         base = this.basePriceFromSegments(asObj, bounds);
-        if (base != null) return base;
+        if (base != null) {
+          const { A, B, C, D } = this.assignToSegments(asObj, bounds);
+          console.log('[Valuation] %s: expanded to prefix=%s | count=%d | segments A=%d B=%d C=%d D=%d (all ≥%d) ✓',
+            groupLabel, pre, asObj.length, A.length, B.length, C.length, D.length, PropertyEstimateService.MIN_RECORDS_PER_SEGMENT);
+          return base;
+        }
       }
+      console.log('[Valuation] %s: insufficient segments even after trying all prefixes (need ≥%d per segment)', groupLabel, PropertyEstimateService.MIN_RECORDS_PER_SEGMENT);
       return null;
     };
 
-    const base1 = await tryBase(group1, split18, end36);
-    const base2 = await tryBase(group2, start36, endGroup2);
+    const base1 = await tryBase(group1, split18, end36, 'latest 18mo');
+    const base2 = await tryBase(group2, start36, endGroup2, 'older 18mo');
 
     console.log('[Valuation] base1 (latest 18 months)=%s base2 (older 18 months)=%s', base1 != null ? base1.toFixed(2) : 'null', base2 != null ? base2.toFixed(2) : 'null');
 
