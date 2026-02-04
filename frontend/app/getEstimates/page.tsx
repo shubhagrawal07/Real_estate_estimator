@@ -94,7 +94,7 @@ export default function GetEstimatesPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Get Property Estimate</h1>
         <p className={styles.subtitle}>
-          Fill out the form below to get an instant estimate of your property's current market value
+          Fill out the form below to get an instant estimate of your property&apos;s current market value
         </p>
       </div>
 
