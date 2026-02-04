@@ -148,9 +148,19 @@ export class PropertyEstimateService {
       dto.apartmentFloor
     );
 
+    // Land area multiplier (only for houses)
+    const landAreaMultiplier = this.getLandAreaMultiplier(
+      dto.type,
+      dto.landSize
+    );
 
     // Condition multiplier
     const conditionMultiplier = this.getConditionMultiplier(dto.condition);
+
+    // Log multipliers for debugging
+    if (dto.type === PropertyType.HOUSE && dto.landSize) {
+      console.log(`[Price Calculation] Land area multiplier: ${landAreaMultiplier.toFixed(3)} (landSize=${dto.landSize} sqm)`);
+    }
 
     // Apply multipliers after basePricePerSqM * area
     const basePrice = savedBasePricePerSqM * dto.area;
@@ -160,6 +170,7 @@ export class PropertyEstimateService {
       bedroomMultiplier *
       // bathroomMultiplier *
       apartmentFloorMultiplier *
+      landAreaMultiplier *
       conditionMultiplier
     );
 
@@ -521,6 +532,67 @@ export class PropertyEstimateService {
 
     // Default fallback (should not reach here, but just in case)
     return 1.0;
+  }
+
+  /**
+   * Get land area multiplier based on land size
+   * Only applies to houses
+   * @param propertyType - Property type (APARTMENT or HOUSE)
+   * @param landSize - Land area in square meters
+   * @returns Multiplier value based on land area:
+   *   - ≤ 300 sqm → x1.00 (neutral)
+   *   - 300–600 sqm → x1.00 (neutral/reference)
+   *   - 600–1,000 sqm → x1.05
+   *   - 1,000–2,000 sqm → x1.08 to x1.10 max (linear interpolation)
+   *   - > 2,000 sqm → cap at x1.10
+   */
+  private getLandAreaMultiplier(
+    propertyType: PropertyType,
+    landSize?: number | null
+  ): number {
+    // Only apply to houses
+    if (propertyType !== PropertyType.HOUSE) {
+      return 1.0;
+    }
+
+    // If land size is not provided or is null, default to 1.0 (no multiplier)
+    if (landSize === null || landSize === undefined) {
+      console.log('[Land Area Multiplier] No land size provided for house, using default multiplier 1.00');
+      return 1.0;
+    }
+
+    let multiplier: number;
+    let range: string;
+
+    // ≤ 300 sqm → x1.00 (neutral)
+    if (landSize <= 300) {
+      multiplier = 1.00;
+      range = '≤300 sqm (neutral)';
+    }
+    // 300–600 sqm → x1.00 (neutral/reference)
+    else if (landSize <= 600) {
+      multiplier = 1.00;
+      range = '300-600 sqm (neutral/reference)';
+    }
+    // 600–1,000 sqm → x1.05
+    else if (landSize < 1000) {
+      multiplier = 1.05;
+      range = '600-1000 sqm';
+    }
+    // 1,000–2,000 sqm → x1.08 to x1.10 max (linear interpolation)
+    else if (landSize <= 2000) {
+      // Linear interpolation: at 1000 sqm = 1.08, at 2000 sqm = 1.10
+      multiplier = 1.08 + ((landSize - 1000) / (2000 - 1000)) * (1.10 - 1.08);
+      range = `1000-2000 sqm (interpolated)`;
+    }
+    // > 2,000 sqm → cap at x1.10
+    else {
+      multiplier = 1.10;
+      range = '>2000 sqm (capped)';
+    }
+
+    console.log(`[Land Area Multiplier] landSize=${landSize} sqm → multiplier=${multiplier.toFixed(3)} (${range})`);
+    return multiplier;
   }
 
   async findAll(): Promise<PropertyEstimate[]> {
