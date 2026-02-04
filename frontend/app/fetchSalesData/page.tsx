@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
@@ -12,7 +12,17 @@ interface BatchStatus {
   savedRecords?: number;
   message?: string;
   error?: string;
+  jobId?: string;
+  startTime?: number;
+  params?: {
+    anneemut_min: number;
+    anneemut_max: number;
+    code_insee: string;
+  };
 }
+
+const STORAGE_KEY = 'fetchSalesData_batchJob';
+const JOB_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes timeout
 
 export default function FetchSalesDataPage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -25,6 +35,85 @@ export default function FetchSalesDataPage() {
   const [batchStatus, setBatchStatus] = useState<BatchStatus>({
     status: 'idle',
   });
+  const [isRestored, setIsRestored] = useState(false);
+  const isMountedRef = useRef(true);
+
+  // Track component mount status
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Periodically check localStorage for status updates (in case fetch completes in another tab/window)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (batchStatus.status === 'running') {
+        const storedJob = localStorage.getItem(STORAGE_KEY);
+        if (storedJob) {
+          try {
+            const job: BatchStatus = JSON.parse(storedJob);
+            // If stored job status is different from current, update
+            if (job.status !== batchStatus.status || 
+                job.totalRecords !== batchStatus.totalRecords ||
+                job.savedRecords !== batchStatus.savedRecords) {
+              console.log('Status update detected in localStorage:', job);
+              setBatchStatus(job);
+              if (job.status === 'completed' || job.status === 'error') {
+                setIsRestored(false);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to parse stored job status:', error);
+          }
+        }
+      }
+    }, 2000); // Check every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [batchStatus.status, batchStatus.totalRecords, batchStatus.savedRecords]);
+
+  // Restore job status from localStorage on mount
+  useEffect(() => {
+    const storedJob = localStorage.getItem(STORAGE_KEY);
+    if (storedJob) {
+      try {
+        const job: BatchStatus = JSON.parse(storedJob);
+        
+        // Restore the job status as-is (don't change running to completed)
+        setBatchStatus(job);
+        setIsRestored(true);
+        
+        // Restore form data if available
+        if (job.params) {
+          setFormData({
+            anneemut_min: String(job.params.anneemut_min),
+            anneemut_max: String(job.params.anneemut_max),
+            code_insee: job.params.code_insee,
+          });
+        }
+
+        // If job was running, check if enough time has passed that it might have completed
+        if (job.status === 'running' && job.startTime) {
+          const elapsed = Date.now() - job.startTime;
+          // If job has been running for more than 5 minutes, it likely completed
+          if (elapsed > 5 * 60 * 1000) {
+            const updatedJob = {
+              ...job,
+              message: 'Job was running when you navigated away. Since backend processes synchronously, the job may have completed, but results are not available. Please check the database or run the job again if needed.',
+            };
+            setBatchStatus(updatedJob);
+            // Update localStorage with the message
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedJob));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to parse stored job status:', error);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
 
   // Redirect if not admin (after session is loaded)
   useEffect(() => {
@@ -59,27 +148,43 @@ export default function FetchSalesDataPage() {
 
     // Validation
     if (!anneemut_min || !anneemut_max || !code_insee) {
-      setBatchStatus({
+      const errorStatus: BatchStatus = {
         status: 'error',
         error: 'All fields are required',
-      });
+      };
+      setBatchStatus(errorStatus);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(errorStatus));
       return;
     }
 
     if (anneemut_min > anneemut_max) {
-      setBatchStatus({
+      const errorStatus: BatchStatus = {
         status: 'error',
         error: 'Minimum year must be less than or equal to maximum year',
-      });
+      };
+      setBatchStatus(errorStatus);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(errorStatus));
       return;
     }
 
+    // Generate unique job ID
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    const params = { anneemut_min, anneemut_max, code_insee };
+
     // Reset status and start batch
-    setBatchStatus({
+    const runningStatus: BatchStatus = {
       status: 'running',
       pagesFetched: 0,
       message: 'Initializing batch job...',
-    });
+      jobId,
+      startTime,
+      params,
+    };
+    setBatchStatus(runningStatus);
+    setIsRestored(false); // New job, not restored
+    // Store in localStorage immediately
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(runningStatus));
 
     try {
       const token = (session as any)?.backendToken;
@@ -87,40 +192,104 @@ export default function FetchSalesDataPage() {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/process-data`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            anneemut_min,
-            anneemut_max,
-            code_insee,
-          }),
+      // Update status to show we're processing
+      setBatchStatus(prev => ({
+        ...prev,
+        message: 'Sending request to backend...',
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        ...runningStatus,
+        message: 'Sending request to backend...',
+      }));
+
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60 * 60 * 1000); // 60 minute timeout
+
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/process-data`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              anneemut_min,
+              anneemut_max,
+              code_insee,
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        // Check if response is ok before parsing
+        let data;
+        try {
+          const responseText = await response.text();
+          if (!responseText) {
+            throw new Error('Empty response from server');
+          }
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse response:', parseError);
+          throw new Error(`Failed to parse server response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
         }
-      );
 
-      const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `Server error: ${response.status} ${response.statusText}`);
+        }
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to process data');
+        // Update status with results
+        const completedStatus: BatchStatus = {
+          status: 'completed',
+          totalRecords: data.totalRecords ?? 0,
+          savedRecords: data.savedRecords ?? 0,
+          message: data.message || 'Batch job completed successfully!',
+          jobId,
+          startTime,
+          params,
+        };
+        
+        console.log('Job completed successfully:', completedStatus);
+        
+        // Always update localStorage first
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(completedStatus));
+        
+        // Update state immediately - React will handle batching
+        setBatchStatus(completedStatus);
+        setIsRestored(false); // Fresh completion
+        
+        console.log('State updated to completed');
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timeout: The job is taking too long. Please try again or check the backend logs.');
+        }
+        throw fetchError;
       }
-
-      // Update status with results
-      setBatchStatus({
-        status: 'completed',
-        totalRecords: data.totalRecords ?? 0,
-        savedRecords: data.savedRecords ?? 0,
-        message: data.message || 'Batch job completed successfully!',
-      });
     } catch (error) {
-      setBatchStatus({
+      console.error('Error processing batch job:', error);
+      const errorStatus: BatchStatus = {
         status: 'error',
         error: error instanceof Error ? error.message : 'An error occurred',
-      });
+        jobId,
+        startTime,
+        params,
+      };
+      
+      // Always update localStorage first
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(errorStatus));
+      
+      // Update state immediately - React will handle batching
+      setBatchStatus(errorStatus);
+      setIsRestored(false); // Fresh error
+      
+      console.log('State updated to error');
     }
   };
 
@@ -139,6 +308,9 @@ export default function FetchSalesDataPage() {
       code_insee: '',
     });
     setBatchStatus({ status: 'idle' });
+    setIsRestored(false);
+    // Clear stored job status
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
@@ -233,6 +405,20 @@ export default function FetchSalesDataPage() {
         {/* Status Display */}
         {batchStatus.status !== 'idle' && (
           <div className={styles.statusContainer}>
+            {isRestored && (
+              <div style={{ 
+                padding: '8px 12px', 
+                backgroundColor: batchStatus.status === 'running' ? '#fff3cd' : '#e3f2fd', 
+                borderRadius: '4px', 
+                marginBottom: '16px',
+                fontSize: '14px',
+                color: batchStatus.status === 'running' ? '#856404' : '#1976d2'
+              }}>
+                {batchStatus.status === 'running' 
+                  ? '⚠️ Job status restored from previous session. The job may still be running on the backend or may have completed while you were away.'
+                  : 'ℹ️ Job status restored from previous session'}
+              </div>
+            )}
             <div className={styles.statusHeader}>
               <h2 className={styles.statusTitle}>Batch Job Status</h2>
               <div
@@ -267,22 +453,25 @@ export default function FetchSalesDataPage() {
                 </div>
               )}
 
-              {batchStatus.totalRecords !== undefined && batchStatus.status === 'completed' && (
-                <div className={styles.statusCard}>
-                  <div className={styles.statusLabel}>Total Records</div>
-                  <div className={styles.statusValue}>
-                    {(batchStatus.totalRecords ?? 0).toLocaleString()}
+              {(batchStatus.totalRecords !== undefined || batchStatus.savedRecords !== undefined) && (
+                <>
+                  <div className={styles.statusCard}>
+                    <div className={styles.statusLabel}>Total Records</div>
+                    <div className={styles.statusValue}>
+                      {batchStatus.totalRecords !== undefined 
+                        ? batchStatus.totalRecords.toLocaleString() 
+                        : '-'}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {batchStatus.savedRecords !== undefined && batchStatus.status === 'completed' && (
-                <div className={styles.statusCard}>
-                  <div className={styles.statusLabel}>Saved Records</div>
-                  <div className={styles.statusValue}>
-                    {(batchStatus.savedRecords ?? 0).toLocaleString()}
+                  <div className={styles.statusCard}>
+                    <div className={styles.statusLabel}>Saved Records</div>
+                    <div className={styles.statusValue}>
+                      {batchStatus.savedRecords !== undefined 
+                        ? batchStatus.savedRecords.toLocaleString() 
+                        : '-'}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 

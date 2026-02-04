@@ -4,6 +4,13 @@ import { combineLocationCode, parseLocationCode } from './utils/location-code.ut
 import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
 import { OutdoorSpace } from './entities/apartment-details.model';
 import { PoolOption } from './entities/house-details.model';
+import {
+  CRITERIA_PRICE_IMPACTS,
+  AMENITY_PRICE_IMPACTS,
+  FEATURE_PRICE_IMPACTS,
+  PARKING_PRICE_IMPACTS,
+  calculateTotalPriceImpact,
+} from './constants/price-impact-factors';
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -57,10 +64,11 @@ export class PropertyEstimateService {
   }
 
   async createEstimate(dto: CreatePropertyEstimateDto, userId?: string): Promise<PropertyEstimate> {
-    const estimatedPrice = await this.calculatePrice(dto);
+    const { basePricePerSqM, estimatedPrice } = await this.calculatePrice(dto);
 
     return this.repo.createWithRelations({
       ...dto,
+      basePricePerSqM,
       estimatedPrice,
       impressions: 0,
       status: userId ? PropertyStatus.NEW : PropertyStatus.DRAFT,
@@ -68,83 +76,357 @@ export class PropertyEstimateService {
     });
   }
 
-  private async calculatePrice(dto: CreatePropertyEstimateDto): Promise<number> {
-    // Try to get euros/m² from city_block_sales_data first
-    let basePricePerSqM = await this.getPricePerSqMFromSalesData(dto.locationCode, dto.type);
-    
+  private async calculatePrice(dto: CreatePropertyEstimateDto): Promise<{ basePricePerSqM: number; estimatedPrice: number }> {
+    // Try segment-based valuation (36 months, sbati segments, weighted formula) first
+    let basePricePerSqM = await this.getPricePerSqMFromSegmentValuation(
+      dto.locationCode,
+      dto.type,
+      dto.area
+    );
+
+    // If segment valuation returns null, try legacy aggregated euros/m²
+    if (!basePricePerSqM) {
+      basePricePerSqM = await this.getPricePerSqMFromSalesData(dto.locationCode, dto.type);
+    }
+
     // If no sales data found, fall back to default pricing
     if (!basePricePerSqM) {
       basePricePerSqM = 2000; // Base price per square meter
-
-      // Extract department from location code for location-based pricing
-      const locationParts = parseLocationCode(dto.locationCode);
-      const department = locationParts?.department || '';
-      
-      // Department-based pricing multiplier
-      const locationMultiplier = this.getLocationMultiplier(department);
-      basePricePerSqM *= locationMultiplier;
     }
 
-    // Property type multiplier
-    const typeMultiplier = dto.type === PropertyType.HOUSE ? 1.2 : 1.0;
-    basePricePerSqM *= typeMultiplier;
+    basePricePerSqM *= 0.90;
+
+    // Save the basePricePerSqM value (this is what we'll store in the database)
+    const savedBasePricePerSqM = basePricePerSqM;
+
+    // Calculate price impacts from criteria, amenities, features, and parking
+    const criteriaCodes: string[] = [];
+    if (dto.criteriaCalm) criteriaCodes.push('calm');
+    if (dto.criteriaBright) criteriaCodes.push('bright');
+    if (dto.criteriaNearAmenities) criteriaCodes.push('near_amenities');
+    if (dto.criteriaNoVisAvis) criteriaCodes.push('no_vis_a_vis');
+    if (dto.criteriaWellConnected) criteriaCodes.push('well_connected');
+
+    const amenityCodes: string[] = [];
+    if (dto.amenityAirConditioning) amenityCodes.push('air_conditioning');
+    if (dto.amenityModernBathroom) amenityCodes.push('modern_bathroom');
+    if (dto.amenityRecentKitchen) amenityCodes.push('recent_kitchen');
+    if (dto.amenityFireplace) amenityCodes.push('fireplace');
+    if (dto.amenityElectricityStandard) amenityCodes.push('electricity_standard');
+    if (dto.amenityDoubleTripleGlazing) amenityCodes.push('double_triple_glazing');
+
+    const featureCodes: string[] = [];
+    if (dto.doubleLivingRoom) featureCodes.push('double_living_room');
+    if (dto.openKitchen) featureCodes.push('open_kitchen');
+    if (dto.laundryCellar) featureCodes.push('laundry_cellar');
+
+    const parkingCodes: string[] = [];
+    if (dto.parkingGarage) parkingCodes.push('garage');
+    if (dto.parkingPrivate) parkingCodes.push('private');
+    if (dto.parkingShared) parkingCodes.push('shared');
+    if (dto.parkingStreet) parkingCodes.push('street');
+
+    // Calculate total price impact percentage
+    const criteriaImpact = calculateTotalPriceImpact(criteriaCodes, CRITERIA_PRICE_IMPACTS);
+    const amenityImpact = calculateTotalPriceImpact(amenityCodes, AMENITY_PRICE_IMPACTS);
+    const featureImpact = calculateTotalPriceImpact(featureCodes, FEATURE_PRICE_IMPACTS);
+    const parkingImpact = calculateTotalPriceImpact(parkingCodes, PARKING_PRICE_IMPACTS);
+
+    const totalPriceImpactPercent = criteriaImpact + amenityImpact + featureImpact + parkingImpact;
+    const priceMultiplier = 1 + totalPriceImpactPercent / 100;
 
     // Bedroom multiplier
     const bedroomMultiplier = 1 + (dto.bedrooms - 2) * 0.1;
     
     // Bathroom multiplier
-    const bathroomMultiplier = 1 + (dto.bathrooms - 1.5) * 0.15;
+    // const bathroomMultiplier = 1 + (dto.bathrooms - 1.5) * 0.15;
 
-    // Floor multiplier (more floors can add value)
-    const floorMultiplier = 1 + (dto.floors - 1) * 0.05;
+    // Apartment floor multiplier (only for apartments)
+    const apartmentFloorMultiplier = this.getApartmentFloorMultiplier(
+      dto.type,
+      dto.apartmentElevator,
+      dto.apartmentFloor
+    );
 
-    // Feature multipliers
-    const balconyMultiplier = dto.hasBalcony ? 1.1 : 1.0;
-    const parkingMultiplier = dto.hasParking ? 1.15 : 1.0;
-
-    // Ownership and deadline multipliers
-    const ownershipMultiplier = dto.ownershipType === OwnershipType.OWNER ? 1.0 : 0.95;
-    const deadlineMultiplier = dto.deadline === Deadline.IMMEDIATE ? 0.98 : 1.0;
+    // Land area multiplier (only for houses)
+    const landAreaMultiplier = this.getLandAreaMultiplier(
+      dto.type,
+      dto.landSize
+    );
 
     // Condition multiplier
     const conditionMultiplier = this.getConditionMultiplier(dto.condition);
 
-    const estimatedPrice =
-      dto.area *
-      basePricePerSqM *
-      bedroomMultiplier *
-      bathroomMultiplier *
-      floorMultiplier *
-      balconyMultiplier *
-      parkingMultiplier *
-      ownershipMultiplier *
-      deadlineMultiplier *
-      conditionMultiplier;
+    // Log multipliers for debugging
+    if (dto.type === PropertyType.HOUSE && dto.landSize) {
+      console.log(`[Price Calculation] Land area multiplier: ${landAreaMultiplier.toFixed(3)} (landSize=${dto.landSize} sqm)`);
+    }
 
-    return Math.round(estimatedPrice);
+    // Apply multipliers after basePricePerSqM * area
+    const basePrice = savedBasePricePerSqM * dto.area;
+    const estimatedPrice = Math.round(
+      basePrice *
+      priceMultiplier *
+      bedroomMultiplier *
+      // bathroomMultiplier *
+      apartmentFloorMultiplier *
+      landAreaMultiplier *
+      conditionMultiplier
+    );
+
+    return {
+      basePricePerSqM: savedBasePricePerSqM,
+      estimatedPrice,
+    };
   }
 
-  private getLocationMultiplier(department: string): number {
-    // Simplified location-based pricing using department code
-    // Department codes: 75=Paris, 69=Lyon, 13=Marseille, 31=Toulouse, 06=Nice, 44=Nantes, 67=Strasbourg, 34=Montpellier, 33=Bordeaux, 59=Lille
-    const locationMultipliers: { [key: string]: number } = {
-      '75': 2.5,  // Paris
-      '69': 1.8,  // Lyon
-      '13': 1.6,  // Marseille
-      '31': 1.4,  // Toulouse
-      '06': 1.9,  // Nice
-      '44': 1.5,  // Nantes
-      '67': 1.3,  // Strasbourg
-      '34': 1.4,  // Montpellier
-      '33': 1.6,  // Bordeaux
-      '59': 1.2,  // Lille
-    };
+  // --- Segment-based valuation (36 months, sbati segments, weighted formula) ---
 
-    return locationMultipliers[department] || 1.0;
+  /** Minimum records per segment (A,B,C,D). If below, we use longest-matching idpar prefix. */
+  private static readonly MIN_RECORDS_PER_SEGMENT = 5;
+
+  /**
+   * Returns idpar prefixes for longest-matching-prefix fallback (stripping from the right).
+   * e.g. "83137000BC" -> ["83137000B", "83137000"]. Stops at length 8 (code_insee+000).
+   */
+  private getIdparPrefixes(idpar: string): string[] {
+    const prefixes: string[] = [];
+    for (let len = idpar.length - 1; len >= 8; len--) {
+      prefixes.push(idpar.slice(0, len));
+    }
+    return prefixes;
   }
 
   /**
-   * Get price per square meter from city_block_sales_data
+   * Segment bounds for sbati (our property's area). Returns [min, max] for each segment.
+   * A: ±20%; B: ±(20–30)%; C: ±(30–40)%; D: ±(40–50)%. Others are ignored.
+   */
+  private getSegmentBounds(sbati: number): { A: [number, number]; B: [number, number][]; C: [number, number][]; D: [number, number][] } {
+    return {
+      A: [sbati * 0.8, sbati * 1.2],
+      B: [[sbati * 0.7, sbati * 0.8], [sbati * 1.2, sbati * 1.3]],
+      C: [[sbati * 0.6, sbati * 0.7], [sbati * 1.3, sbati * 1.4]],
+      D: [[sbati * 0.5, sbati * 0.6], [sbati * 1.4, sbati * 1.5]],
+    };
+  }
+
+  /**
+   * Assigns records to segments A–D. Each record appears in at most one segment.
+   * Uses inclusive bounds: A [0.8,1.2], B [0.7,0.8] and [1.2,1.3], etc.
+   */
+  private assignToSegments<T extends { sbati: number }>(
+    records: T[],
+    bounds: ReturnType<PropertyEstimateService['getSegmentBounds']>
+  ): { A: T[]; B: T[]; C: T[]; D: T[] } {
+    const A: T[] = [];
+    const B: T[] = [];
+    const C: T[] = [];
+    const D: T[] = [];
+    for (const r of records) {
+      const s = Number(r.sbati);
+      if (s >= bounds.A[0] && s <= bounds.A[1]) A.push(r);
+      else if (bounds.B.some(([lo, hi]) => s >= lo && s <= hi)) B.push(r);
+      else if (bounds.C.some(([lo, hi]) => s >= lo && s <= hi)) C.push(r);
+      else if (bounds.D.some(([lo, hi]) => s >= lo && s <= hi)) D.push(r);
+    }
+    return { A, B, C, D };
+  }
+
+  /**
+   * Average price per m² for a segment: (1/n) * sum(price_i / sbati_i).
+   */
+  private avgPricePerSqM(records: { price: number; sbati: number }[]): number {
+    if (records.length === 0) return 0;
+    const sum = records.reduce((acc, r) => acc + Number(r.price) / Math.max(1, Number(r.sbati)), 0);
+    return sum / records.length;
+  }
+
+  /**
+   * Fetch records for a group's date range, optionally using an idpar prefix.
+   */
+  private async fetchGroupRecords(
+    idpar: string,
+    usePrefix: boolean,
+    dvtType: string,
+    start: Date,
+    end: Date
+  ) {
+    return this.cityBlockSalesRepo.findRecordsForValuation(
+      idpar,
+      usePrefix,
+      dvtType,
+      start,
+      end
+    );
+  }
+
+  /**
+   * For a set of records, compute weighted base price per m² if all segments have at least
+   * MIN_RECORDS_PER_SEGMENT. Otherwise returns null.
+   * Formula: 0.5*avgA + 0.25*avgB + 0.15*avgC + 0.1*avgD.
+   */
+  private basePriceFromSegments(
+    records: { sbati: number; price: number }[],
+    bounds: ReturnType<PropertyEstimateService['getSegmentBounds']>
+  ): number | null {
+    const { A, B, C, D } = this.assignToSegments(records, bounds);
+    const min = PropertyEstimateService.MIN_RECORDS_PER_SEGMENT;
+    if (A.length < min || B.length < min || C.length < min || D.length < min) {
+      return null;
+    }
+    const avgA = this.avgPricePerSqM(A);
+    const avgB = this.avgPricePerSqM(B);
+    const avgC = this.avgPricePerSqM(C);
+    const avgD = this.avgPricePerSqM(D);
+    return 0.5 * avgA + 0.25 * avgB + 0.15 * avgC + 0.1 * avgD;
+  }
+
+  /**
+   * Get price per square meter using segment-based valuation:
+   * - Last 36 months of sales for idpar + property type
+   * - Split into latest 18 months and older 18 months
+   * - For each group, segments A–D by sbati (±20%, ±20–30%, ±30–40%, ±40–50%)
+   * - If any segment has &lt;5 records, longest-matching idpar prefix until ≥5
+   * - Base = 0.5*avgA + 0.25*avgB + 0.15*avgC + 0.1*avgD per group; final = 0.55*latest18 + 0.45*older18
+   *
+   * @param locationCode - idpar (e.g. "83137000BY")
+   * @param propertyType - APARTMENT or HOUSE
+   * @param sbati - our property's area (m²)
+   * @returns Price per m² in euros, or null to fall back to aggregated/ default
+   */
+  private async getPricePerSqMFromSegmentValuation(
+    locationCode: string,
+    propertyType: PropertyType,
+    sbati: number
+  ): Promise<number | null> {
+    const dvtType = propertyType === PropertyType.APARTMENT ? 'APPARTEMENT' : 'MAISON';
+    const now = new Date();
+    const m = (n: number) => {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - n);
+      return d;
+    };
+    const end36 = now;
+    const start36 = m(36);
+    const split18 = m(18);
+
+    // 1) Fetch last 36 months - try exact idpar first, then expand to prefixes if no records
+    let all = await this.fetchGroupRecords(locationCode, false, dvtType, start36, end36);
+    if (all.length === 0) {
+      const prefixesForInitial = this.getIdparPrefixes(locationCode);
+      for (const pre of prefixesForInitial) {
+        all = await this.fetchGroupRecords(pre, true, dvtType, start36, end36);
+        if (all.length > 0) {
+          console.log('[Valuation] No exact idpar records; expanded to prefix=%s: %d records (36 months)', pre, all.length);
+          break;
+        }
+      }
+      if (all.length === 0) {
+        console.log('[Valuation] No records for idpar=%s type=%s over 36 months (tried all prefixes), skipping segment valuation', locationCode, dvtType);
+        return null;
+      }
+    } else {
+      console.log('[Valuation] idpar=%s type=%s sbati=%s | raw fetch: %d records (36 months)', locationCode, dvtType, sbati, all.length);
+    }
+
+    const bounds = this.getSegmentBounds(sbati);
+
+    // 2) Split into latest 18 and older 18
+    const group1: { sbati: number; price: number; date: Date }[] = [];
+    const group2: { sbati: number; price: number; date: Date }[] = [];
+    for (const r of all) {
+      const d = typeof r.date === 'string' ? new Date(r.date) : r.date;
+      const row = { sbati: Number(r.sbati), price: Number(r.price), date: d };
+      if (d >= split18) group1.push(row);
+      else if (d >= start36) group2.push(row);
+    }
+
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const endGroup2 = new Date(split18);
+    endGroup2.setDate(endGroup2.getDate() - 1);
+
+    const logGroup = (label: string, recs: { sbati: number; price: number }[], from: Date, to: Date) => {
+      const { A, B, C, D } = this.assignToSegments(recs, bounds);
+      const avgs = {
+        A: A.length ? this.avgPricePerSqM(A).toFixed(0) : '-',
+        B: B.length ? this.avgPricePerSqM(B).toFixed(0) : '-',
+        C: C.length ? this.avgPricePerSqM(C).toFixed(0) : '-',
+        D: D.length ? this.avgPricePerSqM(D).toFixed(0) : '-',
+      };
+      console.log('[Valuation] %s: dateRange [%s, %s] count=%d | segments A=%d B=%d C=%d D=%d | avg €/m² A=%s B=%s C=%s D=%s',
+        label, fmt(from), fmt(to), recs.length, A.length, B.length, C.length, D.length, avgs.A, avgs.B, avgs.C, avgs.D);
+    };
+
+    logGroup('New data (latest 18 months)', group1, split18, end36);
+    logGroup('Old data (older 18 months)', group2, start36, endGroup2);
+
+    const minPerSeg = PropertyEstimateService.MIN_RECORDS_PER_SEGMENT;
+    const { A: a1, B: b1, C: c1, D: d1 } = this.assignToSegments(group1, bounds);
+    const { A: a2, B: b2, C: c2, D: d2 } = this.assignToSegments(group2, bounds);
+    const needExpand1 = a1.length < minPerSeg || b1.length < minPerSeg || c1.length < minPerSeg || d1.length < minPerSeg;
+    const needExpand2 = a2.length < minPerSeg || b2.length < minPerSeg || c2.length < minPerSeg || d2.length < minPerSeg;
+    if (needExpand1 || needExpand2) {
+      console.log('[Valuation] Some segments have <%d records; expanding to idpar prefixes (need ≥%d per A,B,C,D)', minPerSeg, minPerSeg);
+    }
+
+    const prefixes = this.getIdparPrefixes(locationCode);
+
+    const tryBase = async (
+      group: { sbati: number; price: number }[],
+      start: Date,
+      end: Date,
+      groupLabel: string
+    ): Promise<number | null> => {
+      let base = this.basePriceFromSegments(group, bounds);
+      if (base != null) {
+        const { A, B, C, D } = this.assignToSegments(group, bounds);
+        console.log('[Valuation] %s: exact idpar sufficient | count=%d | segments A=%d B=%d C=%d D=%d ✓', groupLabel, group.length, A.length, B.length, C.length, D.length);
+        return base;
+      }
+
+      // Exact idpar has insufficient segments (need ≥5 per A,B,C,D); expand to next prefix
+      for (const pre of prefixes) {
+        const fetched = await this.fetchGroupRecords(pre, true, dvtType, start, end);
+        const asObj = fetched.map((r) => ({ sbati: Number(r.sbati), price: Number(r.price) }));
+        base = this.basePriceFromSegments(asObj, bounds);
+        if (base != null) {
+          const { A, B, C, D } = this.assignToSegments(asObj, bounds);
+          console.log('[Valuation] %s: expanded to prefix=%s | count=%d | segments A=%d B=%d C=%d D=%d (all ≥%d) ✓',
+            groupLabel, pre, asObj.length, A.length, B.length, C.length, D.length, PropertyEstimateService.MIN_RECORDS_PER_SEGMENT);
+          return base;
+        }
+      }
+      console.log('[Valuation] %s: insufficient segments even after trying all prefixes (need ≥%d per segment)', groupLabel, PropertyEstimateService.MIN_RECORDS_PER_SEGMENT);
+      return null;
+    };
+
+    const base1 = await tryBase(group1, split18, end36, 'latest 18mo');
+    const base2 = await tryBase(group2, start36, endGroup2, 'older 18mo');
+
+    console.log('[Valuation] base1 (latest 18 months)=%s base2 (older 18 months)=%s', base1 != null ? base1.toFixed(2) : 'null', base2 != null ? base2.toFixed(2) : 'null');
+
+    let finalBase: number;
+    if (base1 != null && base2 != null) {
+      finalBase = base1 * 0.55 + base2 * 0.45;
+      console.log('[Valuation] final base price €/m²=%s (0.55*%s + 0.45*%s)', finalBase.toFixed(2), base1.toFixed(2), base2.toFixed(2));
+      return finalBase;
+    }
+    if (base1 != null) {
+      finalBase = base1;
+      console.log('[Valuation] final base price €/m²=%s (only latest 18 months)', finalBase.toFixed(2));
+      return finalBase;
+    }
+    if (base2 != null) {
+      finalBase = base2;
+      console.log('[Valuation] final base price €/m²=%s (only older 18 months)', finalBase.toFixed(2));
+      return finalBase;
+    }
+    console.log('[Valuation] final base price=null (insufficient segments in both groups)');
+    return null;
+  }
+
+  /**
+   * Get price per square meter from city_block_sales_data (aggregated, fallback)
    * Uses locationCode as idpar to query the sales data
    * @param locationCode - Location code (format: {code_insee}{padding}{cadastral_section}, e.g., "83137000BY")
    * @param propertyType - Property type (APARTMENT or HOUSE)
@@ -188,14 +470,129 @@ export class PropertyEstimateService {
     if (!condition) return 1.0;
     
     const conditionMultipliers: { [key: string]: number } = {
-      'excellent': 1.2,
-      'good': 1.0,
+      'excellent': 1.12,
+      'good': 0.0,
       'fair': 0.85,
       'poor': 0.7,
-      'needs renovation': 0.6,
+      'needs renovation': 0.88,
     };
 
     return conditionMultipliers[condition.toLowerCase()] || 1.0;
+  }
+
+  /**
+   * Get apartment floor multiplier based on floor number and elevator availability
+   * Only applies to apartments
+   * @param propertyType - Property type (APARTMENT or HOUSE)
+   * @param hasElevator - Whether the apartment has an elevator
+   * @param floorNumber - Floor number (0th, 1st, 2nd, 3rd or higher)
+   * @returns Multiplier value (0.0 for 0th floor, or based on floor and elevator)
+   */
+  private getApartmentFloorMultiplier(
+    propertyType: PropertyType,
+    hasElevator?: boolean | null,
+    floorNumber?: number | null
+  ): number {
+    // Only apply to apartments
+    if (propertyType !== PropertyType.APARTMENT) {
+      return 1.0;
+    }
+
+    // If floor number is not provided or is null, default to 1.0 (no multiplier)
+    if (floorNumber === null || floorNumber === undefined) {
+      return 1.0;
+    }
+
+    // 0th floor always has 0.0 multiplier
+    if (floorNumber === 0) {
+      return 0.0;
+    }
+
+    const hasElevatorValue = hasElevator === true;
+
+    if (!hasElevatorValue) {
+      // Apartment WITHOUT elevator
+      if (floorNumber === 1) {
+        return 0.99;
+      } else if (floorNumber === 2) {
+        return 0.97;
+      } else if (floorNumber >= 3) {
+        return 0.92;
+      }
+    } else {
+      // Apartment WITH elevator
+      if (floorNumber === 1) {
+        return 1.01;
+      } else if (floorNumber === 2) {
+        return 1.02;
+      } else if (floorNumber >= 3) {
+        return 1.04;
+      }
+    }
+
+    // Default fallback (should not reach here, but just in case)
+    return 1.0;
+  }
+
+  /**
+   * Get land area multiplier based on land size
+   * Only applies to houses
+   * @param propertyType - Property type (APARTMENT or HOUSE)
+   * @param landSize - Land area in square meters
+   * @returns Multiplier value based on land area:
+   *   - ≤ 300 sqm → x1.00 (neutral)
+   *   - 300–600 sqm → x1.00 (neutral/reference)
+   *   - 600–1,000 sqm → x1.05
+   *   - 1,000–2,000 sqm → x1.08 to x1.10 max (linear interpolation)
+   *   - > 2,000 sqm → cap at x1.10
+   */
+  private getLandAreaMultiplier(
+    propertyType: PropertyType,
+    landSize?: number | null
+  ): number {
+    // Only apply to houses
+    if (propertyType !== PropertyType.HOUSE) {
+      return 1.0;
+    }
+
+    // If land size is not provided or is null, default to 1.0 (no multiplier)
+    if (landSize === null || landSize === undefined) {
+      console.log('[Land Area Multiplier] No land size provided for house, using default multiplier 1.00');
+      return 1.0;
+    }
+
+    let multiplier: number;
+    let range: string;
+
+    // ≤ 300 sqm → x1.00 (neutral)
+    if (landSize <= 300) {
+      multiplier = 1.00;
+      range = '≤300 sqm (neutral)';
+    }
+    // 300–600 sqm → x1.00 (neutral/reference)
+    else if (landSize <= 600) {
+      multiplier = 1.00;
+      range = '300-600 sqm (neutral/reference)';
+    }
+    // 600–1,000 sqm → x1.05
+    else if (landSize < 1000) {
+      multiplier = 1.05;
+      range = '600-1000 sqm';
+    }
+    // 1,000–2,000 sqm → x1.08 to x1.10 max (linear interpolation)
+    else if (landSize <= 2000) {
+      // Linear interpolation: at 1000 sqm = 1.08, at 2000 sqm = 1.10
+      multiplier = 1.08 + ((landSize - 1000) / (2000 - 1000)) * (1.10 - 1.08);
+      range = `1000-2000 sqm (interpolated)`;
+    }
+    // > 2,000 sqm → cap at x1.10
+    else {
+      multiplier = 1.10;
+      range = '>2000 sqm (capped)';
+    }
+
+    console.log(`[Land Area Multiplier] landSize=${landSize} sqm → multiplier=${multiplier.toFixed(3)} (${range})`);
+    return multiplier;
   }
 
   async findAll(): Promise<PropertyEstimate[]> {
@@ -213,6 +610,7 @@ export class PropertyEstimateService {
     }
 
     // Convert estimate to DTO format for price calculation
+    // Map JSON arrays back to boolean fields for DTO
     const dto: CreatePropertyEstimateDto = {
       address: estimate.address,
       locationCode: estimate.locationCode,
@@ -227,12 +625,42 @@ export class PropertyEstimateService {
       ownershipType: estimate.ownershipType,
       deadline: estimate.deadline,
       condition: estimate.condition,
+      // Map criteria codes to boolean fields
+      criteriaCalm: estimate.criteria?.includes('calm') || false,
+      criteriaBright: estimate.criteria?.includes('bright') || false,
+      criteriaNearAmenities: estimate.criteria?.includes('near_amenities') || false,
+      criteriaNoVisAvis: estimate.criteria?.includes('no_vis_a_vis') || false,
+      criteriaWellConnected: estimate.criteria?.includes('well_connected') || false,
+      // Map amenity codes to boolean fields
+      amenityAirConditioning: estimate.amenities?.includes('air_conditioning') || false,
+      amenityModernBathroom: estimate.amenities?.includes('modern_bathroom') || false,
+      amenityRecentKitchen: estimate.amenities?.includes('recent_kitchen') || false,
+      amenityFireplace: estimate.amenities?.includes('fireplace') || false,
+      amenityElectricityStandard: estimate.amenities?.includes('electricity_standard') || false,
+      amenityDoubleTripleGlazing: estimate.amenities?.includes('double_triple_glazing') || false,
+      // Map feature codes to boolean fields
+      doubleLivingRoom: estimate.features?.includes('double_living_room') || false,
+      openKitchen: estimate.features?.includes('open_kitchen') || false,
+      laundryCellar: estimate.features?.includes('laundry_cellar') || false,
+      // Map parking codes to boolean fields
+      parkingGarage: estimate.parking?.includes('garage') || false,
+      parkingPrivate: estimate.parking?.includes('private') || false,
+      parkingShared: estimate.parking?.includes('shared') || false,
+      parkingStreet: estimate.parking?.includes('street') || false,
+      // Map apartment-specific fields
+      apartmentElevator: estimate.apartmentDetails?.hasElevator || null,
+      apartmentFloor: estimate.apartmentDetails?.floorNumber ?? null,
+      outdoorSpace: estimate.apartmentDetails?.outdoorSpace,
+      // Map house-specific fields
+      landSize: estimate.houseDetails?.landSize ?? null,
+      semiDetached: estimate.houseDetails?.semiDetached ?? null,
+      poolOption: estimate.houseDetails?.poolOption,
     };
 
-    const newEstimatedPrice = await this.calculatePrice(dto);
+    const { basePricePerSqM, estimatedPrice } = await this.calculatePrice(dto);
     
-    // Update only the estimated price
-    return this.repo.updateEstimatedPrice(propertyId, newEstimatedPrice);
+    // Update both basePricePerSqM and estimated price
+    return this.repo.updatePrice(propertyId, basePricePerSqM, estimatedPrice);
   }
 
   async deleteEstimate(propertyId: string): Promise<boolean> {

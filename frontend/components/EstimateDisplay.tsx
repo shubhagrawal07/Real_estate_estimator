@@ -20,6 +20,7 @@ interface PropertyEstimate {
   deadline: string;
   condition?: string;
   estimatedPrice?: number;
+  basePricePerSqM?: number;
   status: string;
   createdDate: string;
 }
@@ -58,7 +59,11 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
         {/* Estimated Value Section */}
         <div className={styles.priceSection}>
           <div className={styles.priceLabel}>Estimated Property Value</div>
-          <div className={styles.priceValue}>{formatPrice(estimate.estimatedPrice)}</div>
+          <div className={styles.priceValue}>
+            {estimate.estimatedPrice
+              ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+              : 'N/A'}
+          </div>
           <div className={styles.priceSubtext}>
             Calculated on {formatDate(estimate.createdDate)}
           </div>
@@ -90,6 +95,12 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
               <span className={styles.summaryLabel}>Area</span>
               <span className={styles.summaryValue}>{estimate.area} m²</span>
             </div>
+            {estimate.basePricePerSqM && (
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Price per m²</span>
+                <span className={styles.summaryValue}>{formatPrice(Math.round(estimate.basePricePerSqM))}</span>
+              </div>
+            )}
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Bedrooms</span>
               <span className={styles.summaryValue}>{estimate.bedrooms}</span>

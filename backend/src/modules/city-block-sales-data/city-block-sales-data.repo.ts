@@ -137,10 +137,50 @@ export class CityBlockSalesDataRepo {
   // ============================================================================
 
   /**
+   * Finds sales records for valuation: by idpar (exact or prefix), property type, and date range.
+   * Used for the segment-based valuation logic (36 months, 2x18 groups, sbati segments).
+   *
+   * @param idpar - IdPar value (e.g. "83137000BC") or prefix (e.g. "83137000B" for LIKE '83137000B%')
+   * @param usePrefix - If true, match idpar LIKE :idpar%; if false, exact idpar
+   * @param propertyType - "APPARTEMENT" or "MAISON"
+   * @param startDate - Start of date range (inclusive)
+   * @param endDate - End of date range (inclusive)
+   * @returns Array of records with idpar, sbati, price, date, type
+   */
+  async findRecordsForValuation(
+    idpar: string,
+    usePrefix: boolean,
+    propertyType: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<CityBlockSalesData[]> {
+    const qb = this.repository
+      .createQueryBuilder('data')
+      .where('data.date >= :startDate', { startDate })
+      .andWhere('data.date <= :endDate', { endDate });
+
+    if (usePrefix) {
+      qb.andWhere('data.idpar LIKE :idparPrefix', { idparPrefix: `${idpar}%` });
+    } else {
+      qb.andWhere('data.idpar = :idpar', { idpar });
+    }
+
+    // Property type: APPARTEMENT vs MAISON (exclude APPARTEMENT INDETERMINE as in data-processor)
+    if (propertyType === 'APPARTEMENT') {
+      qb.andWhere("UPPER(data.type) LIKE '%APPARTEMENT%'");
+      qb.andWhere("UPPER(data.type) NOT LIKE '%APPARTEMENT INDETERMINE%'");
+    } else if (propertyType === 'MAISON') {
+      qb.andWhere("UPPER(data.type) LIKE '%MAISON%'");
+    }
+
+    return qb.orderBy('data.date', 'DESC').getMany();
+  }
+
+  /**
    * Gets aggregated data for a specific idpar
    * Aggregates all records matching the idpar and returns totals by type
-   * Used by property estimate service for price calculations
-   * 
+   * Used by property estimate service for price calculations (fallback)
+   *
    * @param idpar - IdPar value to aggregate
    * @returns Aggregated data by type (apartment/mansion) or null if no records
    */

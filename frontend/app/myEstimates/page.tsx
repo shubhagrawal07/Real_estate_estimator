@@ -24,6 +24,7 @@ interface PropertyEstimate {
   deadline: string;
   condition?: string;
   estimatedPrice?: number;
+  basePricePerSqM?: number;
   status: string;
   createdDate: string;
 }
@@ -248,7 +249,11 @@ export default function MyEstimatesPage() {
                       <span>•</span>
                       <span>{estimate.bedrooms} bed</span>
                     </div>
-                    <div className={styles.estimatePrice}>{formatPrice(estimate.estimatedPrice)}</div>
+                    <div className={styles.estimatePrice}>
+                      {estimate.estimatedPrice
+                        ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+                        : 'N/A'}
+                    </div>
                   </div>
                   <div className={styles.estimateActions}>
                     <button

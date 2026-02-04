@@ -11,6 +11,7 @@ interface EstimateResultProps {
     municipality: string;
     cadastralSection?: string;
     estimatedPrice?: number;
+    basePricePerSqM?: number;
     area: number;
     bedrooms: number;
     bathrooms: number;
@@ -35,9 +36,12 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
     }).format(price);
   };
 
-  const pricePerSqM = estimate.estimatedPrice && estimate.area 
-    ? Math.round(estimate.estimatedPrice / estimate.area) 
-    : 0;
+  // Use basePricePerSqM from API if available, otherwise calculate from estimatedPrice
+  const pricePerSqM = estimate.basePricePerSqM 
+    ? Math.round(estimate.basePricePerSqM)
+    : (estimate.estimatedPrice && estimate.area 
+      ? Math.round(estimate.estimatedPrice / estimate.area) 
+      : 0);
 
   const hasKnownAddress =
     Boolean(estimate.address) &&
@@ -53,7 +57,9 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
       <div className={styles.resultHeader}>
         <h2>Estimated Market Value</h2>
         <div className={styles.price}>
-          {estimate.estimatedPrice ? formatPrice(estimate.estimatedPrice) : 'Calculating...'}
+          {estimate.estimatedPrice
+            ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+            : 'Calculating...'}
         </div>
       </div>
 
