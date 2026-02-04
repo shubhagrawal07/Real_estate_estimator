@@ -35,7 +35,35 @@ A full-stack application for estimating real estate property market values. Buil
 
 ## Quick Start
 
-### Option 1: Using Docker (Recommended)
+### Option 1: Full Docker Deployment (Production Ready)
+
+Deploy the entire application using Docker without sharing source code. See [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md) for detailed instructions.
+
+**Quick start:**
+```bash
+# Build all services
+docker-compose build
+
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+**Export images for deployment:**
+```bash
+# Linux/Mac
+./export-images.sh
+
+# Windows PowerShell
+.\export-images.ps1
+```
+
+### Option 2: Using Docker for PostgreSQL Only
 
 #### 1. Start PostgreSQL with Docker
 
@@ -91,7 +119,7 @@ npm run dev
 
 The frontend will run on `http://localhost:3000`
 
-### Option 2: Local PostgreSQL
+### Option 3: Local PostgreSQL
 
 #### 1. Install and Setup PostgreSQL
 

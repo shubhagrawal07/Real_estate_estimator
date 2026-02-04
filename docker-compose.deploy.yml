@@ -1,3 +1,7 @@
+# Docker Compose file for deployment with pre-built images
+# Use this file when deploying with exported .tar image files
+# Usage: docker-compose -f docker-compose.deploy.yml up -d
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -20,9 +24,10 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    # Use the image name that matches your exported image
+    # After loading: docker load -i backend-image.tar
+    # The image name should be: real_estate_estimator-backend:latest
+    image: real_estate_estimator-backend:latest
     container_name: real_estate_backend
     environment:
       DB_HOST: postgres
@@ -54,9 +59,10 @@ services:
       retries: 3
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    # Use the image name that matches your exported image
+    # After loading: docker load -i frontend-image.tar
+    # The image name should be: real_estate_estimator-frontend:latest
+    image: real_estate_estimator-frontend:latest
     container_name: real_estate_frontend
     environment:
       NODE_ENV: production
@@ -85,3 +91,4 @@ networks:
 
 volumes:
   postgres_data:
+
