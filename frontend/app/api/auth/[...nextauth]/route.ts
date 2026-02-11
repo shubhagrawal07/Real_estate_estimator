@@ -17,8 +17,11 @@ const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       if (account?.provider === 'google' && account.id_token) {
         try {
+          // Use API_URL for server-side calls (internal Docker network) or fallback to NEXT_PUBLIC_API_URL
+          // API_URL should be set to http://backend:3001 in Docker, NEXT_PUBLIC_API_URL is for client-side
+          const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
           // Send the Google token to our backend to authenticate
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/google`, {
+          const response = await fetch(`${apiUrl}/auth/google`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

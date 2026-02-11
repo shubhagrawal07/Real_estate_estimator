@@ -39,6 +39,7 @@ export class CityBlockSalesDataRepo {
 
   /**
    * Inserts multiple records using bulk insert for better performance
+   * Batches inserts to avoid PostgreSQL parameter limit (65535 parameters)
    * 
    * @param dataArray - Array of sales data records to insert
    */
@@ -47,25 +48,37 @@ export class CityBlockSalesDataRepo {
       return;
     }
 
-    // Prepare records for bulk insert
-    const records = dataArray.map((data) =>
-      this.repository.create({
-        idpar: data.idpar,
-        sterr: data.sterr,
-        sbati: data.sbati,
-        price: data.price,
-        date: data.date,
-        type: data.type,
-      })
-    );
+    // PostgreSQL has a limit of ~65535 parameters per query
+    // With 6 fields per record, we can safely insert ~1000 records per batch
+    // (1000 * 6 = 6000 parameters, well under the limit)
+    const BATCH_SIZE = 1000;
 
-    // Execute bulk insert
-    await this.repository
-      .createQueryBuilder()
-      .insert()
-      .into(CityBlockSalesData)
-      .values(records)
-      .execute();
+    // Process in batches
+    for (let i = 0; i < dataArray.length; i += BATCH_SIZE) {
+      const batch = dataArray.slice(i, i + BATCH_SIZE);
+      
+      // Prepare records for bulk insert
+      const records = batch.map((data) =>
+        this.repository.create({
+          idpar: data.idpar,
+          sterr: data.sterr,
+          sbati: data.sbati,
+          price: data.price,
+          date: data.date,
+          type: data.type,
+        })
+      );
+
+      // Execute bulk insert for this batch
+      await this.repository
+        .createQueryBuilder()
+        .insert()
+        .into(CityBlockSalesData)
+        .values(records)
+        .execute();
+
+      console.log(`[DB] Inserted batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(dataArray.length / BATCH_SIZE)} (${batch.length} records)`);
+    }
   }
 
   // ============================================================================
