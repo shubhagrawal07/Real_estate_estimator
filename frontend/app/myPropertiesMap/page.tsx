@@ -6,6 +6,40 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import styles from './page.module.css';
 
+const PROPERTIES_SOURCE_ID = 'properties';
+const PROPERTIES_LAYER_ID = 'properties-pins';
+
+// Pin size: double size, constant when zoomed out, grows to 3x at max zoom
+const PIN_SIZE_ZOOMED_OUT = 1;     // floor — 2x previous, don't get smaller when zooming out
+const PIN_SIZE_MAX_ZOOM = 3;       // at max zoom (20), 2x previous max
+const pinSizeByZoom: [number, number][] = [
+  [0, PIN_SIZE_ZOOMED_OUT],
+  [8, PIN_SIZE_ZOOMED_OUT],
+  [12, (PIN_SIZE_ZOOMED_OUT + PIN_SIZE_MAX_ZOOM) * 0.5],
+  [16, PIN_SIZE_ZOOMED_OUT + (PIN_SIZE_MAX_ZOOM - PIN_SIZE_ZOOMED_OUT) * 0.75],
+  [20, PIN_SIZE_MAX_ZOOM],
+];
+
+const PIN_IMAGE_WIDTH = 24;
+const PIN_IMAGE_HEIGHT = 36;
+
+function getPinSvgHex(fillHex: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PIN_IMAGE_WIDTH} ${PIN_IMAGE_HEIGHT}" width="${PIN_IMAGE_WIDTH}" height="${PIN_IMAGE_HEIGHT}">
+  <circle cx="12" cy="10" r="7" fill="${fillHex}" stroke="#fff" stroke-width="2.5"/>
+  <path d="M5 17 L12 35 L19 17 Z" fill="${fillHex}" stroke="#fff" stroke-width="2.5"/>
+  <circle cx="12" cy="10" r="3" fill="#fff"/>
+</svg>`;
+}
+
+function loadImageAsPromise(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 interface PropertyEstimate {
   propertyId: string;
   address: string;
@@ -17,11 +51,34 @@ interface PropertyEstimate {
   bedrooms: number;
 }
 
+function buildPropertiesGeoJSON(properties: PropertyEstimate[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  const features: GeoJSON.Feature<GeoJSON.Point, { propertyId: string }>[] = properties
+    .filter(
+      (p: PropertyEstimate) =>
+        p.latitude != null &&
+        p.longitude != null &&
+        !isNaN(Number(p.latitude)) &&
+        !isNaN(Number(p.longitude)) &&
+        isFinite(Number(p.latitude)) &&
+        isFinite(Number(p.longitude))
+    )
+    .map((p: PropertyEstimate) => ({
+      type: 'Feature' as const,
+      id: p.propertyId,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [Number(p.longitude), Number(p.latitude)],
+      },
+      properties: { propertyId: p.propertyId },
+    }));
+  return { type: 'FeatureCollection', features };
+}
+
 export default function MyPropertiesMapPage() {
   const { data: session } = useSession();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
+  const popup = useRef<mapboxgl.Popup | null>(null);
   const [properties, setProperties] = useState<PropertyEstimate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +99,10 @@ export default function MyPropertiesMapPage() {
     }
 
     return () => {
-      // Cleanup markers
-      markers.current.forEach(marker => marker.remove());
-      markers.current = [];
+      if (popup.current) {
+        popup.current.remove();
+        popup.current = null;
+      }
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -52,22 +110,17 @@ export default function MyPropertiesMapPage() {
     };
   }, [properties]);
 
+  // Update pin icon (default vs selected) when selection changes
   useEffect(() => {
-    // Update marker styles when selection changes
-    if (mapLoaded && markers.current.length > 0) {
-      markers.current.forEach((marker, index) => {
-        const property = properties[index];
-        if (property && marker.getElement()) {
-          const el = marker.getElement();
-          if (el) {
-            const isSelected = selectedPropertyId === property.propertyId;
-            (el as HTMLElement).style.backgroundColor = isSelected ? '#667eea' : '#764ba2';
-            (el as HTMLElement).style.transform = isSelected ? 'scale(1.2)' : 'scale(1)';
-          }
-        }
-      });
-    }
-  }, [selectedPropertyId, mapLoaded, properties]);
+    if (!map.current || !map.current.getLayer(PROPERTIES_LAYER_ID)) return;
+    const selected = selectedPropertyId ?? '';
+    map.current.setLayoutProperty(PROPERTIES_LAYER_ID, 'icon-image', [
+      'case',
+      ['==', ['get', 'propertyId'], selected],
+      'pin-selected',
+      'pin',
+    ]);
+  }, [selectedPropertyId, mapLoaded]);
 
   const fetchProperties = async () => {
     setLoading(true);
@@ -134,11 +187,63 @@ export default function MyPropertiesMapPage() {
       style: 'mapbox://styles/mapbox/streets-v12',
       center: center as [number, number],
       zoom: properties.length === 1 ? 15 : 12,
+      // Keep a single world copy so markers stay fixed to coordinates when panning/zooming
+      renderWorldCopies: false,
     });
 
-    map.current.on('load', () => {
+    map.current.on('load', async () => {
+      const m = map.current!;
+      const geojson = buildPropertiesGeoJSON(properties);
+      m.addSource(PROPERTIES_SOURCE_ID, { type: 'geojson', data: geojson });
+
+      const pinSvg = getPinSvgHex('#e74c3c');
+      const pinSelectedSvg = getPinSvgHex('#c0392b');
+      const dataUri = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      const [imgPin, imgPinSelected] = await Promise.all([
+        loadImageAsPromise(dataUri(pinSvg)),
+        loadImageAsPromise(dataUri(pinSelectedSvg)),
+      ]);
+      m.addImage('pin', imgPin, { pixelRatio: 2 });
+      m.addImage('pin-selected', imgPinSelected, { pixelRatio: 2 });
+
+      const iconSizeExpr: mapboxgl.Expression = [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        ...pinSizeByZoom.flat(),
+      ];
+      m.addLayer({
+        id: PROPERTIES_LAYER_ID,
+        type: 'symbol',
+        source: PROPERTIES_SOURCE_ID,
+        layout: {
+          'icon-image': 'pin',
+          'icon-size': iconSizeExpr,
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+        },
+      });
+
+      // Offset popup up so it stems from the center of the pin circle (tip is at coords, circle is above)
+      popup.current = new mapboxgl.Popup({ offset: [0, -35], closeOnClick: false });
+      m.on('click', PROPERTIES_LAYER_ID, (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const propertyId = f.properties?.propertyId as string | undefined;
+        if (!propertyId) return;
+        const property = properties.find((p) => p.propertyId === propertyId);
+        if (!property) return;
+        // Use the feature's coordinates (actual property location), not click position —
+        // e.lngLat is where the user clicked on the icon and can be wrong when the icon is large
+        const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+        if (!coords || coords.length < 2) return;
+        setSelectedPropertyId(propertyId);
+        popup.current?.setLngLat(coords).setHTML(createPopupHTML(property)).addTo(m);
+        m.flyTo({ center: coords, zoom: 15, duration: 1000 });
+      });
+      m.on('mouseenter', PROPERTIES_LAYER_ID, () => (m.getCanvas().style.cursor = 'pointer'));
+      m.on('mouseleave', PROPERTIES_LAYER_ID, () => (m.getCanvas().style.cursor = ''));
       setMapLoaded(true);
-      addMarkers();
     });
   };
 
@@ -174,77 +279,6 @@ export default function MyPropertiesMapPage() {
     return [avgLng, avgLat];
   };
 
-  const addMarkers = () => {
-    if (!map.current) return;
-
-    // Remove existing markers
-    markers.current.forEach(marker => marker.remove());
-    markers.current = [];
-
-    properties.forEach((property) => {
-      const lat = Number(property.latitude);
-      const lng = Number(property.longitude);
-      
-      // Validate coordinates are valid numbers
-      if (
-        property.latitude == null || 
-        property.longitude == null || 
-        isNaN(lat) || 
-        isNaN(lng) ||
-        !isFinite(lat) ||
-        !isFinite(lng)
-      ) return;
-
-      // Create marker element
-      const el = document.createElement('div');
-      el.className = styles.marker;
-      el.style.width = '32px';
-      el.style.height = '32px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = selectedPropertyId === property.propertyId ? '#667eea' : '#764ba2';
-      el.style.border = '3px solid white';
-      el.style.cursor = 'pointer';
-      el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
-      el.style.transition = 'all 0.2s';
-      el.style.display = 'flex';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'center';
-      
-      // Add a simple dot indicator
-      const dot = document.createElement('div');
-      dot.style.width = '12px';
-      dot.style.height = '12px';
-      dot.style.borderRadius = '50%';
-      dot.style.backgroundColor = 'white';
-      el.appendChild(dot);
-
-      // Create marker
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([lng, lat])
-        .addTo(map.current!);
-
-      // Create popup
-      const popup = new mapboxgl.Popup({ offset: 25, closeOnClick: false })
-        .setHTML(createPopupHTML(property));
-
-      marker.setPopup(popup);
-
-      // Add click handler
-      el.addEventListener('click', () => {
-        setSelectedPropertyId(property.propertyId);
-        if (map.current && !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
-          map.current.flyTo({
-            center: [lng, lat],
-            zoom: 15,
-            duration: 1500,
-          });
-        }
-      });
-
-      markers.current.push(marker);
-    });
-  };
-
   const createPopupHTML = (property: PropertyEstimate): string => {
     const price = property.estimatedPrice
       ? new Intl.NumberFormat('en-US', {
@@ -270,31 +304,22 @@ export default function MyPropertiesMapPage() {
 
   const handlePropertyClick = (property: PropertyEstimate) => {
     setSelectedPropertyId(property.propertyId);
-    
     const lat = Number(property.latitude);
     const lng = Number(property.longitude);
-    
     if (
-      map.current && 
-      property.latitude != null && 
+      map.current &&
+      property.latitude != null &&
       property.longitude != null &&
-      !isNaN(lat) && 
+      !isNaN(lat) &&
       !isNaN(lng) &&
       isFinite(lat) &&
       isFinite(lng)
     ) {
-      // Fly to property location
-      map.current.flyTo({
-        center: [lng, lat],
-        zoom: 15,
-        duration: 1500,
-      });
-
-      // Open popup for the corresponding marker
-      const markerIndex = properties.findIndex(p => p.propertyId === property.propertyId);
-      if (markerIndex !== -1 && markers.current[markerIndex]) {
-        markers.current[markerIndex].togglePopup();
-      }
+      map.current.flyTo({ center: [lng, lat], zoom: 15, duration: 1500 });
+      popup.current
+        ?.setLngLat([lng, lat])
+        .setHTML(createPopupHTML(property))
+        .addTo(map.current);
     }
   };
 

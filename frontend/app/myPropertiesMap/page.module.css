@@ -125,6 +125,9 @@
   border-radius: 50%;
   cursor: pointer;
   position: relative;
+  box-sizing: border-box;
+  /* Keep marker fixed to coordinates: center is the anchor point */
+  transform-origin: center center;
 }
 
 /* Popup styles are inline in the component since Mapbox popups render outside React */
