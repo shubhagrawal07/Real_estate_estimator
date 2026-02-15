@@ -209,6 +209,9 @@ export default function MyEstimatesPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>My Estimates</h1>
         <p className={styles.subtitle}>View and manage all your property estimates</p>
+        <a href="/myPropertiesMap" className={styles.mapLink}>
+          View on Map →
+        </a>
       </div>
 
       <div className={styles.content}>
