@@ -499,14 +499,10 @@ export class PropertyEstimateService {
     }
 
     // If floor number is not provided or is null, default to 1.0 (no multiplier)
-    if (floorNumber === null || floorNumber === undefined) {
+    if (floorNumber === null || floorNumber === undefined || floorNumber === 0) {
       return 1.0;
     }
 
-    // 0th floor always has 0.0 multiplier
-    if (floorNumber === 0) {
-      return 0.0;
-    }
 
     const hasElevatorValue = hasElevator === true;
 
