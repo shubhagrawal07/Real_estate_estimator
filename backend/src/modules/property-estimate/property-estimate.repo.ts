@@ -2,7 +2,7 @@ import { Repository, In } from 'typeorm';
 import { AppDataSource } from '../../config/db';
 import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge } from './property-estimate.model';
 import { ApartmentDetails, OutdoorSpace } from './entities/apartment-details.model';
-import { HouseDetails, PoolOption } from './entities/house-details.model';
+import { HouseDetails, PoolOption, ExteriorLayoutQuality } from './entities/house-details.model';
 import { CreatePropertyEstimateDto } from './property-estimate.service';
 
 export class PropertyEstimateRepo {
@@ -28,6 +28,8 @@ export class PropertyEstimateRepo {
       outdoorSpace,
       landSize,
       semiDetached,
+      sharedWalls,
+      exteriorLayoutQuality,
       poolOption,
       criteriaCalm,
       criteriaBright,
@@ -102,6 +104,8 @@ export class PropertyEstimateRepo {
         propertyId: savedEstimate.propertyId,
         landSize: landSize || 100,
         semiDetached: semiDetached || false,
+        sharedWalls: sharedWalls ?? (semiDetached ? 1 : 0),
+        exteriorLayoutQuality: exteriorLayoutQuality ?? ExteriorLayoutQuality.BASIC,
         poolOption: poolOption || PoolOption.NOT_POSSIBLE,
       });
       await houseDetailsRepo.save(houseDetails);

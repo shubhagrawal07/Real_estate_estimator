@@ -6,7 +6,7 @@ import {
   BuildingAge,
 } from '../modules/property-estimate/property-estimate.model';
 import { OutdoorSpace } from '../modules/property-estimate/entities/apartment-details.model';
-import { PoolOption } from '../modules/property-estimate/entities/house-details.model';
+import { PoolOption, ExteriorLayoutQuality } from '../modules/property-estimate/entities/house-details.model';
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -29,6 +29,8 @@ export interface CreatePropertyEstimateDto {
   outdoorSpace?: OutdoorSpace;
   landSize?: number | null;
   semiDetached?: boolean | null;
+  sharedWalls?: 0 | 1 | 2 | null;
+  exteriorLayoutQuality?: ExteriorLayoutQuality | null;
   poolOption?: PoolOption;
   criteriaCalm?: boolean;
   criteriaBright?: boolean;

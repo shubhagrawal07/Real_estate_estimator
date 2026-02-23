@@ -3,7 +3,7 @@ import { PropertyEstimate, PropertyType, OwnershipType, Deadline, PropertyStatus
 import { combineLocationCode, parseLocationCode } from './utils/location-code.util';
 import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
 import { OutdoorSpace } from './entities/apartment-details.model';
-import { PoolOption } from './entities/house-details.model';
+import { PoolOption, ExteriorLayoutQuality } from './entities/house-details.model';
 import {
   CRITERIA_PRICE_IMPACTS,
   AMENITY_PRICE_IMPACTS,
@@ -33,6 +33,9 @@ export interface CreatePropertyEstimateDto {
   outdoorSpace?: OutdoorSpace;
   landSize?: number | null;
   semiDetached?: boolean | null;
+  /** 0 = detached, 1 = semi-detached, 2 = two shared walls. If not set, derived from semiDetached. */
+  sharedWalls?: 0 | 1 | 2 | null;
+  exteriorLayoutQuality?: ExteriorLayoutQuality | null;
   poolOption?: PoolOption;
   criteriaCalm?: boolean;
   criteriaBright?: boolean;
@@ -154,30 +157,92 @@ export class PropertyEstimateService {
       dto.landSize
     );
 
+    // Exterior layout quality multiplier (only for houses)
+    const exteriorLayoutMultiplier = this.getExteriorLayoutMultiplier(
+      dto.type,
+      dto.exteriorLayoutQuality
+    );
+
+    // House structural multiplier (only for houses: detached 0%, 1 shared wall -3%, 2 shared walls -6%)
+    const structuralMultiplier = this.getStructuralMultiplier(
+      dto.type,
+      dto.semiDetached,
+      dto.sharedWalls
+    );
+
     // Condition multiplier
     const conditionMultiplier = this.getConditionMultiplier(dto.condition);
 
-    // Log multipliers for debugging
-    if (dto.type === PropertyType.HOUSE && dto.landSize) {
-      console.log(`[Price Calculation] Land area multiplier: ${landAreaMultiplier.toFixed(3)} (landSize=${dto.landSize} sqm)`);
-    }
-
     // Apply multipliers after basePricePerSqM * area
     const basePrice = savedBasePricePerSqM * dto.area;
-    const estimatedPrice = Math.round(
-      basePrice *
+    const rawPrice = basePrice *
       priceMultiplier *
       bedroomMultiplier *
-      // bathroomMultiplier *
       apartmentFloorMultiplier *
       landAreaMultiplier *
-      conditionMultiplier
-    );
+      exteriorLayoutMultiplier *
+      structuralMultiplier *
+      conditionMultiplier;
+
+    // Range adjustment: round center to nearest 5000, apply tiered range width (house and apartment)
+    const roundedCenter = this.roundToNearest5000(rawPrice);
+    const estimatedPrice = roundedCenter;
 
     return {
       basePricePerSqM: savedBasePricePerSqM,
       estimatedPrice,
     };
+  }
+
+  /** Round value to nearest 5000. */
+  private roundToNearest5000(value: number): number {
+    return Math.round(value / 5000) * 5000;
+  }
+
+  /**
+   * Range width (as decimal, e.g. 0.08 for ±8%): ≤250k → ±8%, 250k–500k → ±6%, >500k → ±5%.
+   * Used for display; center price is stored as estimatedPrice.
+   */
+  getRangeWidthPercent(centerPrice: number): number {
+    if (centerPrice <= 250_000) return 0.08;
+    if (centerPrice <= 500_000) return 0.06;
+    return 0.05;
+  }
+
+  /**
+   * Exterior layout quality multiplier (houses only): Basic 0%, Maintained garden +2%, Premium outdoor +3%.
+   */
+  private getExteriorLayoutMultiplier(
+    propertyType: PropertyType,
+    quality?: ExteriorLayoutQuality | null
+  ): number {
+    if (propertyType !== PropertyType.HOUSE || quality == null) return 1.0;
+    switch (quality) {
+      case ExteriorLayoutQuality.BASIC:
+        return 1.0;
+      case ExteriorLayoutQuality.MAINTAINED_GARDEN:
+        return 1.02;
+      case ExteriorLayoutQuality.PREMIUM_OUTDOOR:
+        return 1.03;
+      default:
+        return 1.0;
+    }
+  }
+
+  /**
+   * House structural multiplier: Detached 0%, one shared wall (semi-detached) -3%, two shared walls -6%.
+   * sharedWalls overrides semiDetached when set (0/1/2). If not set, semiDetached true → 1, false → 0.
+   */
+  private getStructuralMultiplier(
+    propertyType: PropertyType,
+    semiDetached?: boolean | null,
+    sharedWalls?: 0 | 1 | 2 | null
+  ): number {
+    if (propertyType !== PropertyType.HOUSE) return 1.0;
+    const walls = sharedWalls ?? (semiDetached ? 1 : 0);
+    if (walls === 0) return 1.0;
+    if (walls === 1) return 0.97;
+    return 0.94; // 2 shared walls
   }
 
   // --- Segment-based valuation (36 months, sbati segments, weighted formula) ---
@@ -531,64 +596,21 @@ export class PropertyEstimateService {
   }
 
   /**
-   * Get land area multiplier based on land size
-   * Only applies to houses
-   * @param propertyType - Property type (APARTMENT or HOUSE)
-   * @param landSize - Land area in square meters
-   * @returns Multiplier value based on land area:
-   *   - ≤ 300 sqm → x1.00 (neutral)
-   *   - 300–600 sqm → x1.00 (neutral/reference)
-   *   - 600–1,000 sqm → x1.05
-   *   - 1,000–2,000 sqm → x1.08 to x1.10 max (linear interpolation)
-   *   - > 2,000 sqm → cap at x1.10
+   * Get land area multiplier based on land size (modest corrections).
+   * Only applies to houses.
+   * <150 m² → -4%; 150–500 m² → 0%; 500–1000 m² → +2%; ≥1000 m² → max +3%
    */
   private getLandAreaMultiplier(
     propertyType: PropertyType,
     landSize?: number | null
   ): number {
-    // Only apply to houses
-    if (propertyType !== PropertyType.HOUSE) {
-      return 1.0;
-    }
+    if (propertyType !== PropertyType.HOUSE) return 1.0;
+    if (landSize === null || landSize === undefined) return 1.0;
 
-    // If land size is not provided or is null, default to 1.0 (no multiplier)
-    if (landSize === null || landSize === undefined) {
-      console.log('[Land Area Multiplier] No land size provided for house, using default multiplier 1.00');
-      return 1.0;
-    }
-
-    let multiplier: number;
-    let range: string;
-
-    // ≤ 300 sqm → x1.00 (neutral)
-    if (landSize <= 300) {
-      multiplier = 1.00;
-      range = '≤300 sqm (neutral)';
-    }
-    // 300–600 sqm → x1.00 (neutral/reference)
-    else if (landSize <= 600) {
-      multiplier = 1.00;
-      range = '300-600 sqm (neutral/reference)';
-    }
-    // 600–1,000 sqm → x1.05
-    else if (landSize < 1000) {
-      multiplier = 1.05;
-      range = '600-1000 sqm';
-    }
-    // 1,000–2,000 sqm → x1.08 to x1.10 max (linear interpolation)
-    else if (landSize <= 2000) {
-      // Linear interpolation: at 1000 sqm = 1.08, at 2000 sqm = 1.10
-      multiplier = 1.08 + ((landSize - 1000) / (2000 - 1000)) * (1.10 - 1.08);
-      range = `1000-2000 sqm (interpolated)`;
-    }
-    // > 2,000 sqm → cap at x1.10
-    else {
-      multiplier = 1.10;
-      range = '>2000 sqm (capped)';
-    }
-
-    console.log(`[Land Area Multiplier] landSize=${landSize} sqm → multiplier=${multiplier.toFixed(3)} (${range})`);
-    return multiplier;
+    if (landSize < 150) return 0.96;
+    if (landSize < 500) return 1.0;
+    if (landSize < 1000) return 1.02;
+    return 1.03; // ≥1000 m² → max +3%
   }
 
   async findAll(): Promise<PropertyEstimate[]> {
@@ -650,6 +672,8 @@ export class PropertyEstimateService {
       // Map house-specific fields
       landSize: estimate.houseDetails?.landSize ?? null,
       semiDetached: estimate.houseDetails?.semiDetached ?? null,
+      sharedWalls: (estimate.houseDetails?.sharedWalls ?? null) as 0 | 1 | 2 | null,
+      exteriorLayoutQuality: estimate.houseDetails?.exteriorLayoutQuality ?? null,
       poolOption: estimate.houseDetails?.poolOption,
     };
 

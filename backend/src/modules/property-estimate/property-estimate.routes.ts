@@ -3,6 +3,27 @@ import { PropertyEstimateService } from './property-estimate.service';
 import { validatePropertyEstimate } from '../../middleware/validate.middleware';
 import { optionalAuth, authenticateToken, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { PropertyEstimateRepo } from './property-estimate.repo';
+import type { PropertyEstimate } from './property-estimate.model';
+
+/** Strip circular refs (e.g. houseDetails.property) so res.json() does not throw. */
+function serializeEstimate(estimate: PropertyEstimate): object {
+  const out = { ...estimate } as Record<string, unknown>;
+  if (out.apartmentDetails && typeof out.apartmentDetails === 'object') {
+    const apt = { ...(out.apartmentDetails as object) } as Record<string, unknown>;
+    delete apt.property;
+    out.apartmentDetails = apt;
+  }
+  if (out.houseDetails && typeof out.houseDetails === 'object') {
+    const house = { ...(out.houseDetails as object) } as Record<string, unknown>;
+    delete house.property;
+    out.houseDetails = house;
+  }
+  return out;
+}
+
+function serializeEstimates(estimates: PropertyEstimate[]): object[] {
+  return estimates.map(serializeEstimate);
+}
 
 const router = Router();
 const propertyEstimateService = new PropertyEstimateService();
@@ -11,7 +32,7 @@ const propertyEstimateRepo = new PropertyEstimateRepo();
 router.post('/', optionalAuth, validatePropertyEstimate, async (req: AuthenticatedRequest, res) => {
   try {
     const estimate = await propertyEstimateService.createEstimate(req.body, req.userId);
-    res.status(201).json(estimate);
+    res.status(201).json(serializeEstimate(estimate));
   } catch (error) {
     res.status(400).json({ 
       message: error instanceof Error ? error.message : 'Failed to create estimate',
@@ -28,9 +49,9 @@ router.get('/user/my-estimates', authenticateToken, async (req: AuthenticatedReq
     }
 
     const estimates = await propertyEstimateRepo.findByUserId(req.userId);
-    res.json(estimates);
+    res.json(serializeEstimates(estimates));
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to fetch user estimates',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -50,9 +71,9 @@ router.post('/link-drafts', authenticateToken, async (req: AuthenticatedRequest,
     }
 
     const updatedEstimates = await propertyEstimateRepo.linkDraftEstimatesToUser(propertyIds, req.userId);
-    res.json({ 
+    res.json({
       message: `Linked ${updatedEstimates.length} estimates to user`,
-      estimates: updatedEstimates 
+      estimates: serializeEstimates(updatedEstimates),
     });
   } catch (error) {
     res.status(500).json({ 
@@ -65,7 +86,7 @@ router.post('/link-drafts', authenticateToken, async (req: AuthenticatedRequest,
 router.get('/', async (req, res) => {
   try {
     const estimates = await propertyEstimateService.findAll();
-    res.json(estimates);
+    res.json(serializeEstimates(estimates));
   } catch (error) {
     res.status(500).json({ 
       message: 'Failed to fetch estimates',
@@ -86,10 +107,9 @@ router.put('/:id/recalculate', async (req, res) => {
     if (!updatedEstimate) {
       return res.status(404).json({ message: 'Estimate not found' });
     }
-    
-    res.json(updatedEstimate);
+    res.json(serializeEstimate(updatedEstimate));
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to recalculate estimate',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -107,10 +127,9 @@ router.get('/:id', async (req, res) => {
     if (!estimate) {
       return res.status(404).json({ message: 'Estimate not found' });
     }
-    
-    res.json(estimate);
+    res.json(serializeEstimate(estimate));
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to fetch estimate',
       error: error instanceof Error ? error.message : 'Unknown error'
     });

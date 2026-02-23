@@ -51,7 +51,8 @@ interface PropertyData {
   outdoorSpace: OutdoorSpace;
 
   landSize: number | null;
-  semiDetached: boolean | null;
+  /** 0 = fully detached, 1 = semi-detached (1 connected wall), 2 = attached (2 connected walls) */
+  sharedWalls: 0 | 1 | 2 | null;
   poolOption: PoolOption;
 
   // Page 3
@@ -121,7 +122,7 @@ export default function PropertyEstimateForm({
     apartmentFloor: 1,
     outdoorSpace: 'none',
     landSize: 200,
-    semiDetached: false,
+    sharedWalls: 0,
     poolOption: 'not_possible',
     criteriaCalm: false,
     criteriaBright: false,
@@ -311,7 +312,7 @@ export default function PropertyEstimateForm({
       return (
         landSize !== null &&
         landSize >= MIN_LAND_SIZE &&
-        formData.semiDetached !== null &&
+        formData.sharedWalls !== null &&
         Boolean(formData.poolOption)
       );
     }
@@ -347,7 +348,7 @@ export default function PropertyEstimateForm({
       apartmentElevator: isApartment ? formData.apartmentElevator : null,
       apartmentFloor: isApartment ? formData.apartmentFloor : null,
       outdoorSpace: isApartment ? formData.outdoorSpace : 'none',
-      semiDetached: isApartment ? null : formData.semiDetached,
+      sharedWalls: isApartment ? null : formData.sharedWalls,
       poolOption: isApartment ? 'not_possible' : formData.poolOption,
     };
 
@@ -702,27 +703,37 @@ export default function PropertyEstimateForm({
           </div>
 
           <div className={styles.section}>
-            <span className={styles.sectionTitle}>Semi-detached</span>
+            <span className={styles.sectionTitle}>Structural type</span>
             <div className={styles.optionGrid}>
               <button
                 type="button"
                 className={`${styles.optionButton} ${
-                  formData.semiDetached === true ? styles.optionSelected : ''
+                  formData.sharedWalls === 0 ? styles.optionSelected : ''
                 }`}
-                onClick={() => setField('semiDetached', true)}
+                onClick={() => setField('sharedWalls', 0)}
               >
-                <span className={styles.buttonIcon}>🏘️</span>
-                <span>Yes</span>
+                <span className={styles.buttonIcon}>🏡</span>
+                <span>Fully detached</span>
               </button>
               <button
                 type="button"
                 className={`${styles.optionButton} ${
-                  formData.semiDetached === false ? styles.optionSelected : ''
+                  formData.sharedWalls === 1 ? styles.optionSelected : ''
                 }`}
-                onClick={() => setField('semiDetached', false)}
+                onClick={() => setField('sharedWalls', 1)}
               >
-                <span className={styles.buttonIcon}>🏡</span>
-                <span>No</span>
+                <span className={styles.buttonIcon}>🏘️</span>
+                <span>Semi detached (1 connected wall)</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.optionButton} ${
+                  formData.sharedWalls === 2 ? styles.optionSelected : ''
+                }`}
+                onClick={() => setField('sharedWalls', 2)}
+              >
+                <span className={styles.buttonIcon}>🏢</span>
+                <span>Attached (2 connected walls)</span>
               </button>
             </div>
           </div>
