@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
+import { getPriceRangeIn5000 } from '@/lib/price-range';
 import styles from './page.module.css';
 
 interface PropertyEstimate {
@@ -254,7 +255,10 @@ export default function MyEstimatesPage() {
                     </div>
                     <div className={styles.estimatePrice}>
                       {estimate.estimatedPrice
-                        ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+                        ? (() => {
+                            const { min, max } = getPriceRangeIn5000(estimate.estimatedPrice);
+                            return `${formatPrice(min)} – ${formatPrice(max)}`;
+                          })()
                         : 'N/A'}
                     </div>
                   </div>

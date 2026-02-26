@@ -184,9 +184,13 @@ export class PropertyEstimateService {
       structuralMultiplier *
       conditionMultiplier;
 
-    // Range adjustment: round center to nearest 5000, apply tiered range width (house and apartment)
+      console.log('rawPrice', rawPrice);
+
+    // Range adjustment: round center down to nearest multiple of 5000, apply tiered range width (house and apartment)
     const roundedCenter = this.roundToNearest5000(rawPrice);
     const estimatedPrice = roundedCenter;
+
+    console.log('estimatedPrice', estimatedPrice);
 
     return {
       basePricePerSqM: savedBasePricePerSqM,
@@ -194,7 +198,7 @@ export class PropertyEstimateService {
     };
   }
 
-  /** Round value to nearest 5000. */
+  /** Round value down to nearest multiple of 5000. */
   private roundToNearest5000(value: number): number {
     return Math.round(value / 5000) * 5000;
   }

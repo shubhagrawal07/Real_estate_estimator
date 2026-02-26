@@ -1,6 +1,7 @@
 'use client';
 
 import styles from './EstimateDisplay.module.css';
+import { getPriceRangeIn5000 } from '@/lib/price-range';
 
 interface PropertyEstimate {
   propertyId: string;
@@ -61,7 +62,10 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
           <div className={styles.priceLabel}>Estimated Property Value</div>
           <div className={styles.priceValue}>
             {estimate.estimatedPrice
-              ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+              ? (() => {
+                  const { min, max } = getPriceRangeIn5000(estimate.estimatedPrice);
+                  return `${formatPrice(min)} – ${formatPrice(max)}`;
+                })()
               : 'N/A'}
           </div>
           <div className={styles.priceSubtext}>

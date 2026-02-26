@@ -1,6 +1,7 @@
 'use client';
 
 import styles from './EstimateResult.module.css';
+import { getPriceRangeIn5000 } from '@/lib/price-range';
 
 interface EstimateResultProps {
   estimate: {
@@ -58,7 +59,10 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
         <h2>Estimated Market Value</h2>
         <div className={styles.price}>
           {estimate.estimatedPrice
-            ? `${formatPrice(Math.round(estimate.estimatedPrice * 0.95))} – ${formatPrice(Math.round(estimate.estimatedPrice * 1.05))}`
+            ? (() => {
+                const { min, max } = getPriceRangeIn5000(estimate.estimatedPrice);
+                return `${formatPrice(min)} – ${formatPrice(max)}`;
+              })()
             : 'Calculating...'}
         </div>
       </div>
