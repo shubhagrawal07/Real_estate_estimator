@@ -82,16 +82,6 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
               <span className={styles.summaryValue}>{estimate.address}</span>
             </div>
             <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Postal Code</span>
-              <span className={styles.summaryValue}>{estimate.postalCode}</span>
-            </div>
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Location</span>
-              <span className={styles.summaryValue}>
-                {estimate.municipality}, {estimate.department}
-              </span>
-            </div>
-            <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Property Type</span>
               <span className={styles.summaryValue}>{estimate.type}</span>
             </div>

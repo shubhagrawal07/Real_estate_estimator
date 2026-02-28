@@ -30,13 +30,18 @@ interface PropertyEstimate {
   createdDate: string;
 }
 
+type TabType = 'estimates' | 'favourites';
+
 export default function MyEstimatesPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabType>('estimates');
   const [estimates, setEstimates] = useState<PropertyEstimate[]>([]);
+  const [favourites, setFavourites] = useState<PropertyEstimate[]>([]);
   const [selectedEstimate, setSelectedEstimate] = useState<PropertyEstimate | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [fetchingFavourites, setFetchingFavourites] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; propertyId: string | null }>({
     show: false,
@@ -45,11 +50,15 @@ export default function MyEstimatesPage() {
 
   useEffect(() => {
     if (session && (session as any).backendToken) {
-      fetchEstimates();
+      if (activeTab === 'estimates') {
+        fetchEstimates();
+      } else if (activeTab === 'favourites') {
+        fetchFavourites();
+      }
     } else {
       setFetching(false);
     }
-  }, [session]);
+  }, [session, activeTab]);
 
   const fetchEstimates = async () => {
     setFetching(true);
@@ -75,6 +84,33 @@ export default function MyEstimatesPage() {
       setError(err instanceof Error ? err.message : 'Failed to load estimates');
     } finally {
       setFetching(false);
+    }
+  };
+
+  const fetchFavourites = async () => {
+    setFetchingFavourites(true);
+    setError(null);
+    try {
+      const token = (session as any).backendToken;
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/user/favourites`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch favourites');
+      }
+
+      const data = await response.json();
+      setFavourites(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load favourites');
+    } finally {
+      setFetchingFavourites(false);
     }
   };
 
@@ -205,34 +241,64 @@ export default function MyEstimatesPage() {
     );
   }
 
+  const currentList = activeTab === 'estimates' ? estimates : favourites;
+  const isLoading = activeTab === 'estimates' ? fetching : fetchingFavourites;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>My Estimates</h1>
-        <p className={styles.subtitle}>View and manage all your property estimates</p>
-        <a href="/myPropertiesMap" className={styles.mapLink}>
-          View on Map →
-        </a>
+        <h1 className={styles.title}>Properties</h1>
+        <p className={styles.subtitle}>View and manage all your properties</p>
+      </div>
+
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${activeTab === 'estimates' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('estimates')}
+        >
+          My Estimates
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'favourites' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('favourites')}
+        >
+          Favourites
+        </button>
       </div>
 
       <div className={styles.content}>
-        {fetching ? (
-          <div className={styles.loading}>Loading estimates...</div>
+        {isLoading ? (
+          <div className={styles.loading}>
+            Loading {activeTab === 'estimates' ? 'estimates' : 'favourites'}...
+          </div>
         ) : error ? (
           <div className={styles.error}>{error}</div>
-        ) : estimates.length === 0 ? (
+        ) : currentList.length === 0 ? (
           <div className={styles.empty}>
-            <p>No estimates found. Create your first estimate!</p>
-            <button 
-              className={styles.createButton}
-              onClick={() => router.push('/getEstimates')}
-            >
-              Get Estimate
-            </button>
+            <p>
+              {activeTab === 'estimates'
+                ? 'No estimates found. Create your first estimate!'
+                : 'No favourites found. Search for properties and add them to your favourites!'}
+            </p>
+            {activeTab === 'estimates' ? (
+              <button 
+                className={styles.createButton}
+                onClick={() => router.push('/getEstimates')}
+              >
+                Get Estimate
+              </button>
+            ) : (
+              <button 
+                className={styles.createButton}
+                onClick={() => router.push('/buyerSearch')}
+              >
+                Search Properties
+              </button>
+            )}
           </div>
         ) : (
           <div className={styles.estimatesList}>
-            {estimates.map((estimate) => (
+            {currentList.map((estimate) => (
               <div key={estimate.propertyId} className={styles.estimateContainer}>
                 <div
                   className={`${styles.estimateItem} ${
@@ -264,12 +330,56 @@ export default function MyEstimatesPage() {
                   </div>
                   <div className={styles.estimateActions}>
                     <button
-                      className={styles.deleteButton}
-                      onClick={(e) => handleDeleteClick(e, estimate.propertyId)}
-                      title="Delete estimate"
+                      className={styles.viewMapButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const source = activeTab === 'favourites' ? 'favourites' : 'estimates';
+                        router.push(`/myPropertiesMap?propertyId=${estimate.propertyId}&source=${source}`);
+                      }}
+                      title="View on map"
                     >
-                      🗑️
+                      🗺️ View on Map
                     </button>
+                    {activeTab === 'estimates' && (
+                      <button
+                        className={styles.deleteButton}
+                        onClick={(e) => handleDeleteClick(e, estimate.propertyId)}
+                        title="Delete estimate"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                    {activeTab === 'favourites' && (
+                      <button
+                        className={styles.deleteButton}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const token = (session as any).backendToken;
+                            const response = await fetch(
+                              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/${estimate.propertyId}`,
+                              {
+                                method: 'DELETE',
+                                headers: {
+                                  Authorization: `Bearer ${token}`,
+                                },
+                              }
+                            );
+                            if (response.ok) {
+                              setFavourites(favourites.filter(f => f.propertyId !== estimate.propertyId));
+                              if (selectedEstimate?.propertyId === estimate.propertyId) {
+                                setSelectedEstimate(null);
+                              }
+                            }
+                          } catch (err) {
+                            console.error('Error removing favourite:', err);
+                          }
+                        }}
+                        title="Remove from favourites"
+                      >
+                        ❤️
+                      </button>
+                    )}
                     <div className={styles.expandIcon}>
                       {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
                     </div>

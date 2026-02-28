@@ -72,7 +72,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠' },
     { path: '/getEstimates', label: 'Get Estimates', icon: '📊' },
-    { path: '/myEstimates', label: 'My Estimates', icon: '📋' },
+    { path: '/myEstimates', label: 'Properties', icon: '📋' },
+    { path: '/buyerSearch', label: 'Search Properties', icon: '🔍' },
     // Admin-only items
     ...(userRole === 'admin' ? [
       { path: '/fetchSalesData', label: 'Fetch sales data', icon: '📥' },

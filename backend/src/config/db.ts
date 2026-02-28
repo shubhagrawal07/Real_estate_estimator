@@ -6,6 +6,7 @@ import { User } from '../modules/user/user.model';
 import { Zone } from '../modules/zone/zone.model';
 import { Subscription } from '../modules/subscription/subscription.model';
 import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
+import { FavouriteProperty } from '../modules/favourite-property/favourite-property.model';
 import { config } from './env';
 
 export const AppDataSource = new DataSource({
@@ -23,6 +24,7 @@ export const AppDataSource = new DataSource({
     Zone,
     Subscription,
     CityBlockSalesData,
+    FavouriteProperty,
   ],
   synchronize: config.nodeEnv !== 'production',
 });

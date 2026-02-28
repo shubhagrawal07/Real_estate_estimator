@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import styles from './page.module.css';
@@ -76,6 +77,7 @@ function buildPropertiesGeoJSON(properties: PropertyEstimate[]): GeoJSON.Feature
 
 export default function MyPropertiesMapPage() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const popup = useRef<mapboxgl.Popup | null>(null);
@@ -91,11 +93,15 @@ export default function MyPropertiesMapPage() {
     } else {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, searchParams]);
 
   useEffect(() => {
     if (properties.length > 0 && mapContainer.current && !map.current) {
       initializeMap();
+    } else if (map.current && map.current.getSource(PROPERTIES_SOURCE_ID)) {
+      // Update existing map source when properties change
+      const geojson = buildPropertiesGeoJSON(properties);
+      (map.current.getSource(PROPERTIES_SOURCE_ID) as mapboxgl.GeoJSONSource).setData(geojson);
     }
 
     return () => {
@@ -122,25 +128,69 @@ export default function MyPropertiesMapPage() {
     ]);
   }, [selectedPropertyId, mapLoaded]);
 
+  // Handle propertyId from URL parameter after map and properties are loaded
+  useEffect(() => {
+    if (!mapLoaded || !map.current || properties.length === 0 || !popup.current) return;
+    
+    const propertyIdFromUrl = searchParams?.get('propertyId');
+    if (propertyIdFromUrl && selectedPropertyId !== propertyIdFromUrl) {
+      const propertyToFocus = properties.find((p) => p.propertyId === propertyIdFromUrl);
+      if (propertyToFocus && propertyToFocus.latitude && propertyToFocus.longitude) {
+        const lat = Number(propertyToFocus.latitude);
+        const lng = Number(propertyToFocus.longitude);
+        if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
+          setSelectedPropertyId(propertyIdFromUrl);
+          const coords: [number, number] = [lng, lat];
+          popup.current.setLngLat(coords).setHTML(createPopupHTML(propertyToFocus)).addTo(map.current);
+          map.current.flyTo({ center: coords, zoom: 15, duration: 1000 });
+        }
+      }
+    }
+  }, [mapLoaded, properties, searchParams, selectedPropertyId]);
+
   const fetchProperties = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = (session as any).backendToken;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/user/my-estimates`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const source = searchParams?.get('source') || 'estimates'; // Default to estimates
+      
+      let data: any[] = [];
+      
+      if (source === 'favourites') {
+        // Fetch favorite properties
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/user/favourites`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch properties');
+        if (!response.ok) {
+          throw new Error('Failed to fetch favourite properties');
+        }
+
+        data = await response.json();
+      } else {
+        // Fetch estimated properties
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/user/my-estimates`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch properties');
+        }
+
+        data = await response.json();
       }
 
-      const data = await response.json();
       // Filter and normalize properties that have valid coordinates
       const propertiesWithCoords = data
         .map((p: any) => ({
@@ -359,10 +409,15 @@ export default function MyPropertiesMapPage() {
   }
 
   if (properties.length === 0) {
+    const source = searchParams?.get('source') || 'estimates';
     return (
       <div className={styles.container}>
         <div className={styles.empty}>
-          <p>No properties with coordinates found.</p>
+          <p>
+            {source === 'favourites' 
+              ? 'No favourite properties with coordinates found.'
+              : 'No properties with coordinates found.'}
+          </p>
           <p className={styles.emptySubtext}>
             Properties need latitude and longitude to be displayed on the map.
           </p>
@@ -374,8 +429,14 @@ export default function MyPropertiesMapPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>My Saved Properties</h1>
-        <p className={styles.subtitle}>View all your properties on an interactive map</p>
+        <h1 className={styles.title}>
+          {searchParams?.get('source') === 'favourites' ? 'My Favourite Properties' : 'My Saved Properties'}
+        </h1>
+        <p className={styles.subtitle}>
+          {searchParams?.get('source') === 'favourites' 
+            ? 'View all your favourite properties on an interactive map'
+            : 'View all your properties on an interactive map'}
+        </p>
       </div>
 
       <div className={styles.mapLayout}>
