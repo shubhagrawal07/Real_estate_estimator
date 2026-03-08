@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../modules/auth/auth.service';
+import { AppError } from '../utils/AppError';
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;
@@ -16,23 +17,19 @@ export function authenticateToken(
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
-    res.status(401).json({ message: 'Access token required' });
+    next(new AppError('Access token required', 401));
     return;
   }
 
   try {
     const authService = new AuthService();
     const decoded = authService.verifyJWT(token);
-    
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     req.userRole = decoded.role;
-    
     next();
   } catch (error) {
-    res.status(403).json({ 
-      message: error instanceof Error ? error.message : 'Invalid or expired token' 
-    });
+    next(error);
   }
 }
 

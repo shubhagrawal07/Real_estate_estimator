@@ -3,21 +3,27 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { buyerService } from '@/services/buyer.service';
 import styles from './page.module.css';
 
 const MIN_BUDGET = 0;
 const MAX_BUDGET = 2000000;
 const BUDGET_STEP = 10000;
+const MIN_AREA = 0;
+const MAX_AREA = 500;
+const MIN_LAND_AREA = 0;
+const MAX_LAND_AREA = 5000;
 
 export default function BuyerSearchPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [formData, setFormData] = useState({
     propertyType: 'Apartment' as 'Apartment' | 'House',
-    cityInseeCode: '',
-    cadastralSection: '',
     budget: 0,
     bedrooms: '',
+    minSurfaceArea: 0,
+    pool: false,
+    minLandArea: 0,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,9 +32,13 @@ export default function BuyerSearchPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === 'cadastralSection' ? value.toUpperCase() : name === 'budget' ? Number(value) : value,
+      [name]:
+        name === 'budget' || name === 'minSurfaceArea' || name === 'minLandArea'
+          ? (value === '' ? 0 : Number(value))
+          : name === 'pool'
+            ? e.target.checked
+            : value,
     }));
-    // Clear error for this field
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -59,18 +69,6 @@ export default function BuyerSearchPage() {
       newErrors.propertyType = 'Property type is required';
     }
 
-    if (!formData.cityInseeCode) {
-      newErrors.cityInseeCode = 'City INSEE code is required';
-    } else if (!/^\d{5}$/.test(formData.cityInseeCode)) {
-      newErrors.cityInseeCode = 'City INSEE code must be 5 digits';
-    }
-
-    if (!formData.cadastralSection) {
-      newErrors.cadastralSection = 'Cadastral section is required';
-    } else if (!/^[A-Z]{2}$/.test(formData.cadastralSection.toUpperCase())) {
-      newErrors.cadastralSection = 'Cadastral section must be 2 alphabetic characters';
-    }
-
     if (formData.budget === undefined || formData.budget < 0 || formData.budget > MAX_BUDGET) {
       newErrors.budget = `Budget must be between 0€ and ${MAX_BUDGET.toLocaleString()}€`;
     }
@@ -82,6 +80,21 @@ export default function BuyerSearchPage() {
       if (!Number.isInteger(bedroomsNum) || bedroomsNum < 0) {
         newErrors.bedrooms = 'Number of bedrooms must be a non-negative integer';
       }
+    }
+
+    if (
+      formData.minSurfaceArea !== undefined &&
+      (formData.minSurfaceArea < MIN_AREA || formData.minSurfaceArea > MAX_AREA)
+    ) {
+      newErrors.minSurfaceArea = `Minimum surface area must be between ${MIN_AREA} and ${MAX_AREA} m²`;
+    }
+
+    if (
+      formData.propertyType === 'House' &&
+      formData.minLandArea !== undefined &&
+      (formData.minLandArea < MIN_LAND_AREA || formData.minLandArea > MAX_LAND_AREA)
+    ) {
+      newErrors.minLandArea = `Minimum land area must be between ${MIN_LAND_AREA} and ${MAX_LAND_AREA} m²`;
     }
 
     setErrors(newErrors);
@@ -102,43 +115,29 @@ export default function BuyerSearchPage() {
 
     setIsSubmitting(true);
 
+    const token = session?.backendToken;
+    if (!token) return;
     try {
-      const token = (session as any).backendToken;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/buyer/search`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            propertyType: formData.propertyType,
-            cityInseeCode: formData.cityInseeCode,
-            cadastralSection: formData.cadastralSection.toUpperCase(),
-            budget: formData.budget,
-            bedrooms: Number(formData.bedrooms),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to search properties');
-      }
-
-      const data = await response.json();
-      
-      // Store search results in sessionStorage and redirect to map page
+      const payload = {
+        propertyType: formData.propertyType,
+        cityInseeCode: '83137',
+        budget: formData.budget,
+        bedrooms: Number(formData.bedrooms),
+        minSurfaceArea: formData.minSurfaceArea ?? 0,
+        pool: formData.propertyType === 'House' ? formData.pool : undefined,
+        minLandArea:
+          formData.propertyType === 'House' && (formData.minLandArea ?? 0) > 0
+            ? formData.minLandArea
+            : undefined,
+      };
+      const data = await buyerService.search(payload, token);
       sessionStorage.setItem('buyerSearchResults', JSON.stringify(data.properties));
       sessionStorage.setItem('buyerSearchCriteria', JSON.stringify({
-        propertyType: formData.propertyType,
-        cityInseeCode: formData.cityInseeCode,
-        cadastralSection: formData.cadastralSection.toUpperCase(),
-        budget: Number(formData.budget),
-        bedrooms: Number(formData.bedrooms),
+        ...payload,
+        minSurfaceArea: formData.minSurfaceArea ?? 0,
+        pool: formData.pool,
+        minLandArea: formData.minLandArea ?? 0,
       }));
-
       router.push('/buyerSearchResults');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to search properties');
@@ -195,47 +194,6 @@ export default function BuyerSearchPage() {
             {errors.propertyType && (
               <span className={styles.errorText}>{errors.propertyType}</span>
             )}
-          </div>
-
-          <div className={styles.section}>
-            <span className={styles.sectionTitle}>
-              City (INSEE Code) <span className={styles.required}>*</span>
-            </span>
-            <input
-              type="text"
-              id="cityInseeCode"
-              name="cityInseeCode"
-              value={formData.cityInseeCode}
-              onChange={handleChange}
-              placeholder="e.g., 83137"
-              maxLength={5}
-              className={`${styles.input} ${errors.cityInseeCode ? styles.error : ''}`}
-            />
-            {errors.cityInseeCode && (
-              <span className={styles.errorText}>{errors.cityInseeCode}</span>
-            )}
-            <span className={styles.helpText}>5-digit INSEE code</span>
-          </div>
-
-          <div className={styles.section}>
-            <span className={styles.sectionTitle}>
-              Cadastral Section <span className={styles.required}>*</span>
-            </span>
-            <input
-              type="text"
-              id="cadastralSection"
-              name="cadastralSection"
-              value={formData.cadastralSection}
-              onChange={handleChange}
-              placeholder="e.g., BY"
-              maxLength={2}
-              className={`${styles.input} ${errors.cadastralSection ? styles.error : ''}`}
-              style={{ textTransform: 'uppercase' }}
-            />
-            {errors.cadastralSection && (
-              <span className={styles.errorText}>{errors.cadastralSection}</span>
-            )}
-            <span className={styles.helpText}>2 alphabetic characters (will be converted to uppercase)</span>
           </div>
 
           <div className={styles.section}>
@@ -329,6 +287,62 @@ export default function BuyerSearchPage() {
               <span className={styles.errorText}>{errors.bedrooms}</span>
             )}
           </div>
+
+          <div className={styles.section}>
+            <span className={styles.sectionTitle}>Minimum surface area (m²)</span>
+            <input
+              type="number"
+              id="minSurfaceArea"
+              name="minSurfaceArea"
+              value={formData.minSurfaceArea === 0 ? '' : formData.minSurfaceArea}
+              onChange={handleChange}
+              placeholder="e.g., 70"
+              min={MIN_AREA}
+              max={MAX_AREA}
+              step="5"
+              className={`${styles.input} ${errors.minSurfaceArea ? styles.error : ''}`}
+            />
+            {errors.minSurfaceArea && (
+              <span className={styles.errorText}>{errors.minSurfaceArea}</span>
+            )}
+            <span className={styles.helpText}>Optional. Leave empty or 0 for no minimum.</span>
+          </div>
+
+          {formData.propertyType === 'House' && (
+            <>
+              <div className={styles.section}>
+                <span className={styles.sectionTitle}>Pool</span>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    name="pool"
+                    checked={formData.pool}
+                    onChange={handleChange}
+                  />
+                  <span>I want a property with a pool (or pool possible)</span>
+                </label>
+              </div>
+              <div className={styles.section}>
+                <span className={styles.sectionTitle}>Minimum land area (m²)</span>
+                <input
+                  type="number"
+                  id="minLandArea"
+                  name="minLandArea"
+                  value={formData.minLandArea === 0 ? '' : formData.minLandArea}
+                  onChange={handleChange}
+                  placeholder="e.g., 500"
+                  min={MIN_LAND_AREA}
+                  max={MAX_LAND_AREA}
+                  step="50"
+                  className={`${styles.input} ${errors.minLandArea ? styles.error : ''}`}
+                />
+                {errors.minLandArea && (
+                  <span className={styles.errorText}>{errors.minLandArea}</span>
+                )}
+                <span className={styles.helpText}>Optional. Leave empty or 0 for no minimum.</span>
+              </div>
+            </>
+          )}
 
           <button
             type="submit"

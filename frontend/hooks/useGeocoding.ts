@@ -72,15 +72,27 @@ export function useGeocoding() {
       const data = await response.json();
       
       if (data.features && Array.isArray(data.features)) {
-        const addressSuggestions: AddressSuggestion[] = data.features.map((feature: any) => ({
-          label: feature.properties.label || feature.properties.name || '',
-          id: feature.id || feature.properties.id || '',
-          geometry: feature.geometry,
+        interface GeocodeFeature {
+          id?: string;
+          geometry?: { coordinates: [number, number] };
+          properties?: {
+            label?: string;
+            name?: string;
+            citycode?: string;
+            postcode?: string;
+            city?: string;
+            context?: string;
+          };
+        }
+        const addressSuggestions: AddressSuggestion[] = data.features.map((feature: GeocodeFeature) => ({
+          label: feature.properties?.label || feature.properties?.name || '',
+          id: feature.id || feature.properties?.citycode || '',
+          geometry: feature.geometry ?? { coordinates: [0, 0] },
           properties: {
-            citycode: feature.properties.citycode,
-            postcode: feature.properties.postcode,
-            city: feature.properties.city || feature.properties.name,
-            context: feature.properties.context,
+            citycode: feature.properties?.citycode,
+            postcode: feature.properties?.postcode,
+            city: feature.properties?.city || feature.properties?.name,
+            context: feature.properties?.context,
           },
         }));
 

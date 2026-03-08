@@ -13,6 +13,35 @@
   flex-shrink: 0;
 }
 
+.headerWithBack {
+  padding: 1rem 2rem;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #667eea;
+  background: transparent;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backButton:hover {
+  background: rgba(102, 126, 234, 0.08);
+  border-color: #667eea;
+  color: #5a67d8;
+}
+
 .title {
   font-size: 2rem;
   font-weight: 700;

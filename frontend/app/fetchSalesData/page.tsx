@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { processDataService } from '@/services/process-data.service';
 import styles from './page.module.css';
 
 interface BatchStatus {
@@ -115,15 +116,11 @@ export default function FetchSalesDataPage() {
     }
   }, []);
 
-  // Redirect if not admin (after session is loaded)
   useEffect(() => {
-    if (sessionStatus === 'authenticated') {
-      const userRole = (session as any)?.userRole;
-      if (userRole !== 'admin') {
-        router.push('/');
-      }
+    if (sessionStatus === 'authenticated' && session?.userRole !== 'admin') {
+      router.push('/');
     }
-  }, [session, sessionStatus, router]);
+  }, [session?.userRole, sessionStatus, router]);
 
   // Show loading state while checking session
   if (sessionStatus === 'loading') {
@@ -134,8 +131,7 @@ export default function FetchSalesDataPage() {
     );
   }
 
-  // Don't render if not admin
-  if (sessionStatus === 'authenticated' && (session as any)?.userRole !== 'admin') {
+  if (sessionStatus === 'authenticated' && session?.userRole !== 'admin') {
     return null;
   }
 
@@ -187,13 +183,12 @@ export default function FetchSalesDataPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(runningStatus));
 
     try {
-      const token = (session as any)?.backendToken;
+      const token = session?.backendToken;
       if (!token) {
         throw new Error('Not authenticated');
       }
 
-      // Update status to show we're processing
-      setBatchStatus(prev => ({
+      setBatchStatus((prev) => ({
         ...prev,
         message: 'Sending request to backend...',
       }));
@@ -202,76 +197,23 @@ export default function FetchSalesDataPage() {
         message: 'Sending request to backend...',
       }));
 
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60 * 60 * 1000); // 60 minute timeout
+      const data = await processDataService.process(
+        { anneemut_min, anneemut_max, code_insee },
+        token
+      );
 
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/process-data`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              anneemut_min,
-              anneemut_max,
-              code_insee,
-            }),
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
-        // Check if response is ok before parsing
-        let data;
-        try {
-          const responseText = await response.text();
-          if (!responseText) {
-            throw new Error('Empty response from server');
-          }
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Failed to parse response:', parseError);
-          throw new Error(`Failed to parse server response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
-        }
-
-        if (!response.ok) {
-          throw new Error(data.message || `Server error: ${response.status} ${response.statusText}`);
-        }
-
-        // Update status with results
-        const completedStatus: BatchStatus = {
-          status: 'completed',
-          totalRecords: data.totalRecords ?? 0,
-          savedRecords: data.savedRecords ?? 0,
-          message: data.message || 'Batch job completed successfully!',
-          jobId,
-          startTime,
-          params,
-        };
-        
-        console.log('Job completed successfully:', completedStatus);
-        
-        // Always update localStorage first
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(completedStatus));
-        
-        // Update state immediately - React will handle batching
-        setBatchStatus(completedStatus);
-        setIsRestored(false); // Fresh completion
-        
-        console.log('State updated to completed');
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error('Request timeout: The job is taking too long. Please try again or check the backend logs.');
-        }
-        throw fetchError;
-      }
+      const completedStatus: BatchStatus = {
+        status: 'completed',
+        totalRecords: data.totalRecords ?? 0,
+        savedRecords: data.savedRecords ?? 0,
+        message: data.message || 'Batch job completed successfully!',
+        jobId,
+        startTime,
+        params,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(completedStatus));
+      setBatchStatus(completedStatus);
+      setIsRestored(false);
     } catch (error) {
       console.error('Error processing batch job:', error);
       const errorStatus: BatchStatus = {

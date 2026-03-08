@@ -119,6 +119,14 @@
   border-bottom: 2px solid #f0f0f0;
 }
 
+.estimateItem.notExpandable {
+  cursor: default;
+}
+
+.estimateItem.notExpandable:hover {
+  background: transparent;
+}
+
 .estimateSummary {
   flex: 1;
 }

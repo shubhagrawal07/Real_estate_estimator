@@ -2,76 +2,44 @@
 
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import PropertyEstimateForm from '@/components/PropertyEstimateForm';
+import PropertyEstimateForm, { type PropertyData } from '@/components/PropertyEstimateForm';
 import EstimateResult from '@/components/EstimateResult';
 import LoadingScreen from '@/components/LoadingScreen';
+import { propertyEstimateService } from '@/services/property-estimate.service';
+import type { PropertyEstimateResponse } from '@/types/estimate';
 import styles from './page.module.css';
 
 export default function GetEstimatesPage() {
   const { data: session } = useSession();
-  const [estimate, setEstimate] = useState<any>(null);
+  const [estimate, setEstimate] = useState<PropertyEstimateResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleEstimate = async (propertyData: any) => {
+  const handleEstimate = async (propertyData: PropertyData) => {
     setLoading(true);
     setError(null);
     setEstimate(null);
 
     const startTime = Date.now();
-    const MIN_LOADING_TIME = 5000; // 5 seconds minimum loading time
+    const MIN_LOADING_TIME = 5000;
 
     try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
+      const token = session?.backendToken ?? null;
+      const data = await propertyEstimateService.create(propertyData, token);
 
-      // Add auth token if user is logged in
-      if (session && (session as any).backendToken) {
-        headers['Authorization'] = `Bearer ${(session as any).backendToken}`;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate`,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(propertyData),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || 
-          `Server error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      
-      // Store estimate in localStorage
       localStorage.setItem('latestEstimate', JSON.stringify(data));
-      
-      // If user is not logged in, store the property ID as draft
       if (!session) {
         const draftEstimates = JSON.parse(localStorage.getItem('draftEstimates') || '[]');
         draftEstimates.push(data.propertyId);
         localStorage.setItem('draftEstimates', JSON.stringify(draftEstimates));
       }
-      
-      // Ensure loading screen is visible for at least 5 seconds
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
-      
       if (remainingTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, remainingTime));
+        await new Promise((resolve) => setTimeout(resolve, remainingTime));
       }
-      
-      // Set estimate to display on same page
       setEstimate(data);
     } catch (err) {
-      // Ensure loading screen is visible for at least 5 seconds even on error
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
       

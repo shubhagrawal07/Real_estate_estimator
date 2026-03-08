@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import EstimateResult from '@/components/EstimateResult';
+import type { PropertyEstimateResponse } from '@/types/estimate';
 import styles from './page.module.css';
 
 export default function EstimatePage() {
-  const [estimate, setEstimate] = useState<any>(null);
+  const [estimate, setEstimate] = useState<PropertyEstimateResponse | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem('latestEstimate');

@@ -1,4 +1,4 @@
-import { Repository, In } from 'typeorm';
+import { Repository, In, QueryRunner } from 'typeorm';
 import { AppDataSource } from '../../config/db';
 import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge } from './property-estimate.model';
 import { ApartmentDetails, OutdoorSpace } from './entities/apartment-details.model';
@@ -208,5 +208,24 @@ export class PropertyEstimateRepo {
   async delete(propertyId: string): Promise<boolean> {
     const result = await this.repository.delete({ propertyId });
     return (result.affected ?? 0) > 0;
+  }
+
+  async incrementImpressions(
+    propertyId: string,
+    delta: number,
+    queryRunner?: QueryRunner
+  ): Promise<void> {
+    const qr = queryRunner ?? AppDataSource.createQueryRunner();
+    if (!queryRunner) await qr.connect();
+    try {
+      await qr.query(
+        `UPDATE property_estimates
+         SET impressions = GREATEST(0, COALESCE(impressions, 0) + $1)
+         WHERE "propertyId" = $2`,
+        [delta, propertyId]
+      );
+    } finally {
+      if (!queryRunner) await qr.release();
+    }
   }
 }

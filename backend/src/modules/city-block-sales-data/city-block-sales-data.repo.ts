@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { AppDataSource } from '../../config/db';
 import { CityBlockSalesData } from './city-block-sales-data.model';
 import { SalesDataRecord } from './types';
+import { logger } from '../../utils/logger';
 
 export class CityBlockSalesDataRepo {
   private repository: Repository<CityBlockSalesData>;
@@ -77,7 +78,11 @@ export class CityBlockSalesDataRepo {
         .values(records)
         .execute();
 
-      console.log(`[DB] Inserted batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(dataArray.length / BATCH_SIZE)} (${batch.length} records)`);
+      logger.info('Inserted batch', {
+        batch: Math.floor(i / BATCH_SIZE) + 1,
+        totalBatches: Math.ceil(dataArray.length / BATCH_SIZE),
+        recordCount: batch.length,
+      });
     }
   }
 

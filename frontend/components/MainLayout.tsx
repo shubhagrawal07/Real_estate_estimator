@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { usePathname, useRouter } from 'next/navigation';
+import { propertyEstimateService } from '@/services/property-estimate.service';
 import styles from './MainLayout.module.css';
 
 interface MainLayoutProps {
@@ -33,41 +34,29 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Link draft estimates when user logs in
+  const token = session?.backendToken;
+
   useEffect(() => {
-    if (session && (session as any).backendToken) {
+    if (session?.backendToken) {
       linkDraftEstimates();
     }
-  }, [session]);
+  }, [session?.backendToken]);
 
   const linkDraftEstimates = async () => {
     const draftEstimates = localStorage.getItem('draftEstimates');
-    if (draftEstimates) {
-      try {
-        const propertyIds = JSON.parse(draftEstimates);
-        if (propertyIds.length > 0) {
-          const token = (session as any).backendToken;
-          await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/link-drafts`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ propertyIds }),
-            }
-          );
-          localStorage.removeItem('draftEstimates');
-        }
-      } catch (err) {
-        console.error('Failed to link draft estimates:', err);
+    if (!draftEstimates || !token) return;
+    try {
+      const propertyIds = JSON.parse(draftEstimates) as string[];
+      if (propertyIds.length > 0) {
+        await propertyEstimateService.linkDrafts(propertyIds, token);
+        localStorage.removeItem('draftEstimates');
       }
+    } catch {
+      // Silent fail for link drafts
     }
   };
 
-  // Get user role from session
-  const userRole = (session as any)?.userRole || (session as any)?.backendUserRole;
+  const userRole = session?.userRole;
 
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠' },

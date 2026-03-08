@@ -31,10 +31,10 @@ const authOptions: NextAuthOptions = {
 
           if (response.ok) {
             const data = await response.json();
-            // Store the JWT token in the user object
-            (user as any).backendToken = data.token;
-            (user as any).backendUserId = data.user.userId;
-            (user as any).backendUserRole = data.user.role;
+            const u = user as { backendToken?: string; backendUserId?: string; backendUserRole?: string };
+            u.backendToken = data.token;
+            u.backendUserId = data.user.userId;
+            u.backendUserRole = data.user.role;
             return true;
           }
         } catch (error) {
@@ -53,10 +53,11 @@ const authOptions: NextAuthOptions = {
         if (user.image) {
           token.picture = user.image;
         }
-        if ((user as any).backendToken) {
-          token.backendToken = (user as any).backendToken;
-          token.backendUserId = (user as any).backendUserId;
-          token.backendUserRole = (user as any).backendUserRole;
+        const u = user as { backendToken?: string; backendUserId?: string; backendUserRole?: string };
+        if (u.backendToken) {
+          token.backendToken = u.backendToken;
+          token.backendUserId = u.backendUserId;
+          token.backendUserRole = u.backendUserRole;
         }
       }
       return token;
@@ -65,19 +66,16 @@ const authOptions: NextAuthOptions = {
       // Include user image and other data in session
       if (token) {
         if (session.user) {
-          const user = session.user as any;
-          if (token.id) user.id = token.id as string;
-          if (token.name) user.name = token.name as string;
-          if (token.email) user.email = token.email as string;
-          // Ensure image is set from token.picture
-          if (token.picture) {
-            user.image = token.picture as string;
-          }
+          const u = session.user as { id?: string; name?: string; email?: string; image?: string };
+          if (token.id) u.id = token.id as string;
+          if (token.name) u.name = token.name as string;
+          if (token.email) u.email = token.email as string;
+          if (token.picture) u.image = token.picture as string;
         }
         if (token.backendToken) {
-          (session as any).backendToken = token.backendToken;
-          (session as any).backendUserId = token.backendUserId;
-          (session as any).userRole = token.backendUserRole;
+          session.backendToken = token.backendToken;
+          session.backendUserId = token.backendUserId;
+          session.userRole = token.backendUserRole;
         }
       }
       return session;

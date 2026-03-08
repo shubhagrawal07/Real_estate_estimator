@@ -212,6 +212,22 @@
   color: #718096;
 }
 
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: #333;
+  cursor: pointer;
+}
+
+.checkboxLabel input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: #667eea;
+  cursor: pointer;
+}
+
 .submitButton {
   padding: 0.85rem 1.5rem;
   border: none;

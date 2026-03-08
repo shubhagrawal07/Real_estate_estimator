@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { propertyEstimateService } from '@/services/property-estimate.service';
+import { favouritePropertyService } from '@/services/favourite-property.service';
+import type { PropertyEstimateResponse } from '@/types/estimate';
 import styles from './page.module.css';
 
 const PROPERTIES_SOURCE_ID = 'properties';
@@ -75,9 +78,10 @@ function buildPropertiesGeoJSON(properties: PropertyEstimate[]): GeoJSON.Feature
   return { type: 'FeatureCollection', features };
 }
 
-export default function MyPropertiesMapPage() {
+function MyPropertiesMapContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const popup = useRef<mapboxgl.Popup | null>(null);
@@ -86,14 +90,23 @@ export default function MyPropertiesMapPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const propertiesRef = useRef<PropertyEstimate[]>([]);
+  const initialUrlFocusDoneRef = useRef(false);
+
+  const token = session?.backendToken;
+
+  // Keep ref in sync so pin click handler always has latest properties (avoids stale closure)
+  useEffect(() => {
+    propertiesRef.current = properties;
+  }, [properties]);
 
   useEffect(() => {
-    if (session && (session as any).backendToken) {
+    if (token) {
       fetchProperties();
     } else {
       setLoading(false);
     }
-  }, [session, searchParams]);
+  }, [token, searchParams]);
 
   useEffect(() => {
     if (properties.length > 0 && mapContainer.current && !map.current) {
@@ -128,81 +141,50 @@ export default function MyPropertiesMapPage() {
     ]);
   }, [selectedPropertyId, mapLoaded]);
 
-  // Handle propertyId from URL parameter after map and properties are loaded
+  // Handle propertyId from URL only once on initial load (so switching pins/cards is not overwritten)
   useEffect(() => {
-    if (!mapLoaded || !map.current || properties.length === 0 || !popup.current) return;
-    
+    if (!mapLoaded || !map.current || properties.length === 0 || !popup.current || initialUrlFocusDoneRef.current) return;
+
     const propertyIdFromUrl = searchParams?.get('propertyId');
-    if (propertyIdFromUrl && selectedPropertyId !== propertyIdFromUrl) {
-      const propertyToFocus = properties.find((p) => p.propertyId === propertyIdFromUrl);
-      if (propertyToFocus && propertyToFocus.latitude && propertyToFocus.longitude) {
-        const lat = Number(propertyToFocus.latitude);
-        const lng = Number(propertyToFocus.longitude);
-        if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
-          setSelectedPropertyId(propertyIdFromUrl);
-          const coords: [number, number] = [lng, lat];
-          popup.current.setLngLat(coords).setHTML(createPopupHTML(propertyToFocus)).addTo(map.current);
-          map.current.flyTo({ center: coords, zoom: 15, duration: 1000 });
-        }
+    if (!propertyIdFromUrl) return;
+
+    const propertyToFocus = properties.find((p) => p.propertyId === propertyIdFromUrl);
+    if (propertyToFocus && propertyToFocus.latitude != null && propertyToFocus.longitude != null) {
+      const lat = Number(propertyToFocus.latitude);
+      const lng = Number(propertyToFocus.longitude);
+      if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
+        initialUrlFocusDoneRef.current = true;
+        setSelectedPropertyId(propertyIdFromUrl);
+        const coords: [number, number] = [lng, lat];
+        popup.current.setLngLat(coords).setHTML(createPopupHTML(propertyToFocus)).addTo(map.current);
+        map.current.flyTo({ center: coords, zoom: 15, duration: 1000 });
       }
     }
-  }, [mapLoaded, properties, searchParams, selectedPropertyId]);
+  }, [mapLoaded, properties, searchParams]);
 
   const fetchProperties = async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      const token = (session as any).backendToken;
-      const source = searchParams?.get('source') || 'estimates'; // Default to estimates
-      
-      let data: any[] = [];
-      
+      const source = searchParams?.get('source') || 'estimates';
+      let data: PropertyEstimateResponse[];
       if (source === 'favourites') {
-        // Fetch favorite properties
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/user/favourites`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch favourite properties');
-        }
-
-        data = await response.json();
+        data = await favouritePropertyService.getUserFavourites(token);
       } else {
-        // Fetch estimated properties
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/user/my-estimates`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch properties');
-        }
-
-        data = await response.json();
+        data = await propertyEstimateService.getMyEstimates(token);
       }
-
-      // Filter and normalize properties that have valid coordinates
       const propertiesWithCoords = data
-        .map((p: any) => ({
+        .map((p: PropertyEstimateResponse) => ({
           ...p,
           latitude: p.latitude ? Number(p.latitude) : undefined,
           longitude: p.longitude ? Number(p.longitude) : undefined,
         }))
         .filter(
-          (p: PropertyEstimate) => 
-            p.latitude != null && 
-            p.longitude != null && 
-            !isNaN(p.latitude) && 
+          (p: PropertyEstimate) =>
+            p.latitude != null &&
+            p.longitude != null &&
+            !isNaN(p.latitude) &&
             !isNaN(p.longitude) &&
             isFinite(p.latitude) &&
             isFinite(p.longitude)
@@ -279,15 +261,16 @@ export default function MyPropertiesMapPage() {
       m.on('click', PROPERTIES_LAYER_ID, (e) => {
         const f = e.features?.[0];
         if (!f) return;
-        const propertyId = f.properties?.propertyId as string | undefined;
+        const propertyId = String(f.properties?.propertyId ?? (f as GeoJSON.Feature & { id?: string }).id ?? '');
         if (!propertyId) return;
-        const property = properties.find((p) => p.propertyId === propertyId);
+        const currentProperties = propertiesRef.current;
+        const property = currentProperties.find((p) => p.propertyId === propertyId || String(p.propertyId) === propertyId);
         if (!property) return;
         // Use the feature's coordinates (actual property location), not click position —
         // e.lngLat is where the user clicked on the icon and can be wrong when the icon is large
         const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
         if (!coords || coords.length < 2) return;
-        setSelectedPropertyId(propertyId);
+        setSelectedPropertyId(property.propertyId);
         popup.current?.setLngLat(coords).setHTML(createPopupHTML(property)).addTo(m);
         m.flyTo({ center: coords, zoom: 15, duration: 1000 });
       });
@@ -365,9 +348,13 @@ export default function MyPropertiesMapPage() {
       isFinite(lat) &&
       isFinite(lng)
     ) {
+      // Ensure popup exists (e.g. if sidebar card was clicked before map load finished)
+      if (!popup.current) {
+        popup.current = new mapboxgl.Popup({ offset: [0, -35], closeOnClick: false });
+      }
       map.current.flyTo({ center: [lng, lat], zoom: 15, duration: 1500 });
       popup.current
-        ?.setLngLat([lng, lat])
+        .setLngLat([lng, lat])
         .setHTML(createPopupHTML(property))
         .addTo(map.current);
     }
@@ -382,9 +369,23 @@ export default function MyPropertiesMapPage() {
     }).format(price);
   };
 
+  const backButton = (
+    <button
+      type="button"
+      className={styles.backButton}
+      onClick={() => router.back()}
+      title="Back to previous page"
+    >
+      ← Back
+    </button>
+  );
+
   if (!session) {
     return (
       <div className={styles.container}>
+        <div className={styles.headerWithBack}>
+          {backButton}
+        </div>
         <div className={styles.notLoggedIn}>
           <p>Please log in to view your properties on the map.</p>
         </div>
@@ -395,6 +396,9 @@ export default function MyPropertiesMapPage() {
   if (loading) {
     return (
       <div className={styles.container}>
+        <div className={styles.headerWithBack}>
+          {backButton}
+        </div>
         <div className={styles.loading}>Loading properties...</div>
       </div>
     );
@@ -403,6 +407,9 @@ export default function MyPropertiesMapPage() {
   if (error) {
     return (
       <div className={styles.container}>
+        <div className={styles.headerWithBack}>
+          {backButton}
+        </div>
         <div className={styles.error}>{error}</div>
       </div>
     );
@@ -412,6 +419,9 @@ export default function MyPropertiesMapPage() {
     const source = searchParams?.get('source') || 'estimates';
     return (
       <div className={styles.container}>
+        <div className={styles.headerWithBack}>
+          {backButton}
+        </div>
         <div className={styles.empty}>
           <p>
             {source === 'favourites' 
@@ -429,6 +439,7 @@ export default function MyPropertiesMapPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
+        {backButton}
         <h1 className={styles.title}>
           {searchParams?.get('source') === 'favourites' ? 'My Favourite Properties' : 'My Saved Properties'}
         </h1>
@@ -479,3 +490,10 @@ export default function MyPropertiesMapPage() {
   );
 }
 
+export default function MyPropertiesMapPage() {
+  return (
+    <Suspense fallback={<div className={styles.loading}>Loading map...</div>}>
+      <MyPropertiesMapContent />
+    </Suspense>
+  );
+}

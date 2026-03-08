@@ -7,7 +7,9 @@ import { Zone } from '../modules/zone/zone.model';
 import { Subscription } from '../modules/subscription/subscription.model';
 import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
 import { FavouriteProperty } from '../modules/favourite-property/favourite-property.model';
+import { BuyerEngagement } from '../modules/buyer-engagement/buyer-engagement.model';
 import { config } from './env';
+import { logger } from '../utils/logger';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -25,6 +27,7 @@ export const AppDataSource = new DataSource({
     Subscription,
     CityBlockSalesData,
     FavouriteProperty,
+    BuyerEngagement,
   ],
   synchronize: config.nodeEnv !== 'production',
 });
@@ -68,9 +71,8 @@ export const initializeDatabase = async (): Promise<void> => {
         await queryRunner.release();
         await tempDataSource.destroy();
         
-        // If no tables exist, create a new DataSource with synchronize enabled
         if (tables.length === 0) {
-          console.log('No tables found. Creating database schema...');
+          logger.info('No tables found. Creating database schema');
           const syncDataSource = new DataSource({
             type: 'postgres',
             host: config.db.host,
@@ -92,9 +94,9 @@ export const initializeDatabase = async (): Promise<void> => {
           
           await syncDataSource.initialize();
           await syncDataSource.destroy();
-          console.log('Database schema created successfully');
+          logger.info('Database schema created successfully');
         } else {
-          console.log(`Found ${tables.length} existing table(s)`);
+          logger.info('Existing tables found', { count: tables.length });
         }
       } catch (error) {
         await queryRunner.release();
@@ -103,14 +105,12 @@ export const initializeDatabase = async (): Promise<void> => {
       }
     }
     
-    // Initialize the main DataSource
     await AppDataSource.initialize();
-    console.log('Database connected successfully');
-    
-    // Note: Reference data (criteria, amenities, features, parking) is now hardcoded
-    // in price-impact-factors.ts constants file, so seeding is no longer needed
+    logger.info('Database connected successfully');
   } catch (error) {
-    console.error('Error connecting to database:', error);
+    logger.error('Error connecting to database', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 };

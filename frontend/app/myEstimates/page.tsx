@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
+import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyEstimates';
+import { propertyEstimateService } from '@/services/property-estimate.service';
+import { favouritePropertyService } from '@/services/favourite-property.service';
 import styles from './page.module.css';
 
 interface PropertyEstimate {
@@ -33,107 +35,59 @@ interface PropertyEstimate {
 type TabType = 'estimates' | 'favourites';
 
 export default function MyEstimatesPage() {
-  const { data: session } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('estimates');
-  const [estimates, setEstimates] = useState<PropertyEstimate[]>([]);
-  const [favourites, setFavourites] = useState<PropertyEstimate[]>([]);
+  const {
+    estimates,
+    setEstimates,
+    loading: fetching,
+    error: errorEstimates,
+    refetch: fetchEstimates,
+    token,
+  } = useMyEstimates();
+  const {
+    favourites,
+    setFavourites,
+    loading: fetchingFavourites,
+    error: errorFavourites,
+    refetch: fetchFavourites,
+  } = useFavourites();
   const [selectedEstimate, setSelectedEstimate] = useState<PropertyEstimate | null>(null);
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [fetchingFavourites, setFetchingFavourites] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; propertyId: string | null }>({
     show: false,
     propertyId: null,
   });
 
+  const error = activeTab === 'estimates' ? errorEstimates : errorFavourites;
+
   useEffect(() => {
-    if (session && (session as any).backendToken) {
-      if (activeTab === 'estimates') {
-        fetchEstimates();
-      } else if (activeTab === 'favourites') {
-        fetchFavourites();
-      }
-    } else {
-      setFetching(false);
+    if (token) {
+      if (activeTab === 'estimates') fetchEstimates();
+      else fetchFavourites();
     }
-  }, [session, activeTab]);
+  }, [token, activeTab, fetchEstimates, fetchFavourites]);
 
-  const fetchEstimates = async () => {
-    setFetching(true);
-    setError(null);
-    try {
-      const token = (session as any).backendToken;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/user/my-estimates`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch estimates');
-      }
-
-      const data = await response.json();
-      setEstimates(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load estimates');
-    } finally {
-      setFetching(false);
-    }
-  };
-
-  const fetchFavourites = async () => {
-    setFetchingFavourites(true);
-    setError(null);
-    try {
-      const token = (session as any).backendToken;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/user/favourites`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch favourites');
-      }
-
-      const data = await response.json();
-      setFavourites(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load favourites');
-    } finally {
-      setFetchingFavourites(false);
-    }
-  };
+  // Collapse expanded card when switching to favourites tab
+  useEffect(() => {
+    if (activeTab === 'favourites') setSelectedEstimate(null);
+  }, [activeTab]);
 
   const fetchEstimate = async (estimateId: string) => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/${estimateId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedEstimate(data);
-      } else {
-        console.error('Failed to fetch estimate');
-      }
-    } catch (error) {
-      console.error('Error fetching estimate:', error);
+      const data = await propertyEstimateService.getById(estimateId);
+      setSelectedEstimate(data as unknown as PropertyEstimate);
+    } catch {
+      // Silent fail
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEstimateClick = (estimate: PropertyEstimate) => {
+  const handleEstimateClick = (estimate: EstimateItem | PropertyEstimate) => {
+    // Favourites tab: cards are not expandable
+    if (activeTab === 'favourites') return;
     // If clicking the same estimate, collapse it
     if (selectedEstimate?.propertyId === estimate.propertyId) {
       setSelectedEstimate(null);
@@ -144,28 +98,17 @@ export default function MyEstimatesPage() {
 
   const handleRecalculate = async () => {
     if (!selectedEstimate) return;
-    
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/${selectedEstimate.propertyId}/recalculate`,
-        {
-          method: 'PUT',
-        }
+      const data = await propertyEstimateService.recalculate(selectedEstimate.propertyId);
+      setSelectedEstimate(data as unknown as PropertyEstimate);
+      setEstimates(
+        estimates.map((e) =>
+          e.propertyId === data.propertyId ? (data as unknown as PropertyEstimate) : e
+        ) as EstimateItem[]
       );
-
-      if (!response.ok) {
-        throw new Error('Failed to recalculate estimate');
-      }
-
-      const data = await response.json();
-      setSelectedEstimate(data);
-      // Update in list
-      setEstimates(estimates.map(e => 
-        e.propertyId === data.propertyId ? data : e
-      ));
-    } catch (error) {
-      console.error('Error recalculating estimate:', error);
+    } catch {
+      // Silent fail
     } finally {
       setLoading(false);
     }
@@ -177,23 +120,9 @@ export default function MyEstimatesPage() {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm.propertyId) return;
-
+    if (!deleteConfirm.propertyId || !token) return;
     try {
-      const token = (session as any).backendToken;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/property-estimate/${deleteConfirm.propertyId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to delete estimate');
-      }
+      await propertyEstimateService.delete(deleteConfirm.propertyId, token);
 
       // Remove from list
       setEstimates(estimates.filter(e => e.propertyId !== deleteConfirm.propertyId));
@@ -231,7 +160,7 @@ export default function MyEstimatesPage() {
     }).format(price);
   };
 
-  if (!session) {
+  if (!token) {
     return (
       <div className={styles.container}>
         <div className={styles.notLoggedIn}>
@@ -302,14 +231,17 @@ export default function MyEstimatesPage() {
               <div key={estimate.propertyId} className={styles.estimateContainer}>
                 <div
                   className={`${styles.estimateItem} ${
-                    selectedEstimate?.propertyId === estimate.propertyId ? styles.expanded : ''
-                  }`}
+                    activeTab === 'estimates' &&
+                    selectedEstimate?.propertyId === estimate.propertyId
+                      ? styles.expanded
+                      : ''
+                  } ${activeTab === 'favourites' ? styles.notExpandable : ''}`}
                   onClick={() => handleEstimateClick(estimate)}
                 >
                   <div className={styles.estimateSummary}>
                     <div className={styles.estimateHeader}>
                       <span className={styles.status}>{estimate.status}</span>
-                      <span className={styles.date}>{formatDate(estimate.createdDate)}</span>
+                      <span className={styles.date}>{formatDate(estimate.createdDate ?? '')}</span>
                     </div>
                     <div className={styles.estimateAddress}>{estimate.address}</div>
                     <div className={styles.estimateDetails}>
@@ -349,30 +281,19 @@ export default function MyEstimatesPage() {
                         🗑️
                       </button>
                     )}
-                    {activeTab === 'favourites' && (
+                    {activeTab === 'favourites' && token && (
                       <button
                         className={styles.deleteButton}
                         onClick={async (e) => {
                           e.stopPropagation();
                           try {
-                            const token = (session as any).backendToken;
-                            const response = await fetch(
-                              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/${estimate.propertyId}`,
-                              {
-                                method: 'DELETE',
-                                headers: {
-                                  Authorization: `Bearer ${token}`,
-                                },
-                              }
-                            );
-                            if (response.ok) {
-                              setFavourites(favourites.filter(f => f.propertyId !== estimate.propertyId));
-                              if (selectedEstimate?.propertyId === estimate.propertyId) {
-                                setSelectedEstimate(null);
-                              }
+                            await favouritePropertyService.remove(estimate.propertyId, token);
+                            setFavourites(favourites.filter((f) => f.propertyId !== estimate.propertyId));
+                            if (selectedEstimate?.propertyId === estimate.propertyId) {
+                              setSelectedEstimate(null);
                             }
-                          } catch (err) {
-                            console.error('Error removing favourite:', err);
+                          } catch {
+                            // Silent fail
                           }
                         }}
                         title="Remove from favourites"
@@ -380,13 +301,16 @@ export default function MyEstimatesPage() {
                         ❤️
                       </button>
                     )}
-                    <div className={styles.expandIcon}>
-                      {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
-                    </div>
+                    {activeTab === 'estimates' && (
+                      <div className={styles.expandIcon}>
+                        {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {selectedEstimate?.propertyId === estimate.propertyId && (
+                {activeTab === 'estimates' &&
+                  selectedEstimate?.propertyId === estimate.propertyId && (
                   <div className={styles.estimateDetailExpanded}>
                     {loading ? (
                       <div className={styles.loading}>Loading details...</div>

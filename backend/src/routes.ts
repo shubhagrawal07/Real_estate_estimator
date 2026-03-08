@@ -4,6 +4,7 @@ import authRoutes from './modules/auth/auth.routes';
 import cityBlockSalesDataRoutes from './modules/city-block-sales-data/city-block-sales-data.routes';
 import buyerRoutes from './modules/buyer/buyer.routes';
 import favouritePropertyRoutes from './modules/favourite-property/favourite-property.routes';
+import buyerEngagementRoutes from './modules/buyer-engagement/buyer-engagement.routes';
 
 export function mountRoutes(app: Express): void {
   app.use('/auth', authRoutes);
@@ -11,4 +12,5 @@ export function mountRoutes(app: Express): void {
   app.use('/process-data', cityBlockSalesDataRoutes);
   app.use('/buyer', buyerRoutes);
   app.use('/favourite-property', favouritePropertyRoutes);
+  app.use('/buyer-engagement', buyerEngagementRoutes);
 }

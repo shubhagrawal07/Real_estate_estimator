@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useGeocoding, type AddressSuggestion } from '@/hooks/useGeocoding';
+import { ProgressStepHeader } from './estimate-form/ProgressStepHeader';
 import styles from './PropertyEstimateForm.module.css';
 
 export enum PropertyType {
@@ -25,7 +26,7 @@ type OutdoorSpace = 'none' | 'lt10' | 'gte10';
 type PoolOption = 'pool' | 'possible' | 'not_possible';
 type ConditionValue = 'excellent' | 'good' | 'needs renovation';
 
-interface PropertyData {
+export interface PropertyData {
   // Required fields
   address: string;
   locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
@@ -327,9 +328,6 @@ export default function PropertyEstimateForm({
       console.log('Form submission blocked - not on step 3 or validation failed');
       return;
     }
-    
-    console.log('Submitting form...');
-
     const hasParking =
       formData.parkingGarage ||
       formData.parkingPrivate ||
@@ -988,14 +986,12 @@ export default function PropertyEstimateForm({
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
-      <div className={styles.progressHeader}>
-        <span>Step {currentStep} / 3</span>
-        <span>{stepLabels[currentStep - 1]}</span>
-      </div>
-      <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
-      </div>
-
+      <ProgressStepHeader
+        currentStep={currentStep}
+        totalSteps={3}
+        stepLabels={stepLabels}
+        progressPercent={progressPercent}
+      />
       <div key={currentStep} className={styles.stepContainer}>
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}

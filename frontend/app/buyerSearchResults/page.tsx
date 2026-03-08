@@ -5,6 +5,9 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { favouritePropertyService } from '@/services/favourite-property.service';
+import { buyerEngagementService } from '@/services/buyer-engagement.service';
+import type { BuyerSearchCriteria } from '@/types/estimate';
 import styles from './page.module.css';
 
 const PROPERTIES_SOURCE_ID = 'properties';
@@ -52,7 +55,25 @@ interface RankedProperty {
   bedrooms: number;
   rankScore: number;
   budgetScore: number;
+  surfaceAreaScore: number;
   bedroomScore: number;
+  poolScore?: number;
+  landAreaScore?: number;
+}
+
+type MatchLevel = 'Strong match' | 'High match' | 'Possible match';
+
+/** Maps numeric score (0–100) to display label. */
+function getMatchLabel(rankScore: number): MatchLevel {
+  if (rankScore >= 75) return 'Strong match';
+  if (rankScore >= 50) return 'High match';
+  return 'Possible match';
+}
+
+function getMatchLevelClass(level: MatchLevel): string {
+  if (level === 'Strong match') return styles.matchStrong;
+  if (level === 'High match') return styles.matchHigh;
+  return styles.matchPossible;
 }
 
 function buildPropertiesGeoJSON(properties: RankedProperty[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
@@ -85,13 +106,21 @@ export default function BuyerSearchResultsPage() {
   const map = useRef<mapboxgl.Map | null>(null);
   const popup = useRef<mapboxgl.Popup | null>(null);
   const [properties, setProperties] = useState<RankedProperty[]>([]);
-  const [searchCriteria, setSearchCriteria] = useState<any>(null);
+  const [searchCriteria, setSearchCriteria] = useState<BuyerSearchCriteria | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [favourites, setFavourites] = useState<Record<string, boolean>>({});
   const [updatingFavourites, setUpdatingFavourites] = useState<Record<string, boolean>>({});
+  const [interested, setInterested] = useState<Record<string, boolean>>({});
+  const [updatingInterested, setUpdatingInterested] = useState<Record<string, boolean>>({});
+  const searchCriteriaRef = useRef<BuyerSearchCriteria | null>(null);
+  const interestedInFlightRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    searchCriteriaRef.current = searchCriteria;
+  }, [searchCriteria]);
 
   useEffect(() => {
     // Load search results from sessionStorage
@@ -111,79 +140,133 @@ export default function BuyerSearchResultsPage() {
       setSearchCriteria(criteria);
       setLoading(false);
       
-      // Load favorite status for all properties
-      if (session && (session as any).backendToken && results.length > 0) {
-        loadFavourites(results.map((p: RankedProperty) => p.propertyId));
+      if (session?.backendToken && results.length > 0) {
+        const ids = results.map((p: RankedProperty) => p.propertyId);
+        loadFavourites(ids);
+        loadEngagements(ids);
       }
     } catch (err) {
       setError('Failed to load search results');
       setLoading(false);
     }
-  }, [session]);
+  }, [session?.backendToken]);
+
+  const token = session?.backendToken;
 
   const loadFavourites = async (propertyIds: string[]) => {
-    if (!session || !(session as any).backendToken) return;
-
+    if (!token) return;
     try {
-      const token = (session as any).backendToken;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/batch/check`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ propertyIds }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setFavourites(data.favourites || {});
-      }
-    } catch (err) {
-      console.error('Failed to load favourites:', err);
+      const data = await favouritePropertyService.checkBatch(propertyIds, token);
+      setFavourites(data.favourites ?? {});
+    } catch {
+      // Silent fail
     }
   };
 
-  const toggleFavourite = async (propertyId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering property click
+  const loadEngagements = async (propertyIds: string[]) => {
+    if (!token) return;
+    try {
+      const engagements = await buyerEngagementService.checkBatch(propertyIds, token);
+      setInterested(
+        Object.fromEntries(
+          Object.entries(engagements).map(([id, r]) => [id, r.interested])
+        )
+      );
+    } catch {
+      // Silent fail
+    }
+  };
 
-    if (!session || !(session as any).backendToken) {
+  const recordEngagementClick = (propertyId: string) => {
+    const criteria = searchCriteriaRef.current;
+    if (!token || !criteria) return;
+    const budget = Number(criteria.budget);
+    const bedrooms = Number(criteria.bedrooms);
+    const minSurfaceArea = Number(criteria.minSurfaceArea);
+    const minLandArea =
+      criteria.minLandArea != null && criteria.minLandArea !== ''
+        ? Number(criteria.minLandArea)
+        : null;
+    buyerEngagementService
+      .recordClick(
+        propertyId,
+        {
+          budget: Number.isFinite(budget) ? budget : 0,
+          bedrooms: Number.isFinite(bedrooms) ? bedrooms : 0,
+          minSurfaceArea: Number.isFinite(minSurfaceArea) ? minSurfaceArea : 0,
+          pool: Boolean(criteria.pool),
+          minLandArea:
+            minLandArea != null && Number.isFinite(minLandArea) ? minLandArea : null,
+        },
+        token
+      )
+      .catch(() => {});
+  };
+
+  const toggleFavourite = async (propertyId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!token) {
       alert('Please log in to save favorites');
       return;
     }
-
     setUpdatingFavourites((prev) => ({ ...prev, [propertyId]: true }));
-
     try {
-      const token = (session as any).backendToken;
       const isCurrentlyFavourite = favourites[propertyId];
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/favourite-property/${propertyId}`,
-        {
-          method: isCurrentlyFavourite ? 'DELETE' : 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        setFavourites((prev) => ({
-          ...prev,
-          [propertyId]: !isCurrentlyFavourite,
-        }));
+      if (isCurrentlyFavourite) {
+        await favouritePropertyService.remove(propertyId, token);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update favorite');
+        await favouritePropertyService.add(propertyId, token);
       }
+      setFavourites((prev) => ({
+        ...prev,
+        [propertyId]: !isCurrentlyFavourite,
+      }));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update favorite');
     } finally {
       setUpdatingFavourites((prev) => {
+        const newState = { ...prev };
+        delete newState[propertyId];
+        return newState;
+      });
+    }
+  };
+
+  const toggleInterested = async (propertyId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!token) return;
+    const criteria = searchCriteriaRef.current;
+    if (!criteria) return;
+    if (interestedInFlightRef.current.has(propertyId)) return;
+    interestedInFlightRef.current.add(propertyId);
+    setUpdatingInterested((prev) => ({ ...prev, [propertyId]: true }));
+    try {
+      const payload = {
+        budget: Number.isFinite(Number(criteria.budget)) ? Number(criteria.budget) : 0,
+        bedrooms: Number.isFinite(Number(criteria.bedrooms)) ? Number(criteria.bedrooms) : 0,
+        minSurfaceArea: Number.isFinite(Number(criteria.minSurfaceArea)) ? Number(criteria.minSurfaceArea) : 0,
+        pool: Boolean(criteria.pool),
+        minLandArea:
+          criteria.minLandArea != null && criteria.minLandArea !== '' && Number.isFinite(Number(criteria.minLandArea))
+            ? Number(criteria.minLandArea)
+            : null,
+      };
+      const result = await buyerEngagementService.toggleInterested(
+        propertyId,
+        payload,
+        token
+      );
+      if (typeof result?.interested === 'boolean') {
+        setInterested((prev) => ({
+          ...prev,
+          [propertyId]: result.interested,
+        }));
+      }
+    } catch {
+      // Leave local state unchanged on error; user can retry
+    } finally {
+      interestedInFlightRef.current.delete(propertyId);
+      setUpdatingInterested((prev) => {
         const newState = { ...prev };
         delete newState[propertyId];
         return newState;
@@ -285,6 +368,7 @@ export default function BuyerSearchResultsPage() {
         if (!property) return;
         const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
         if (!coords || coords.length < 2) return;
+        recordEngagementClick(propertyId);
         setSelectedPropertyId(propertyId);
         popup.current?.setLngLat(coords).setHTML(createPopupHTML(property)).addTo(m);
         m.flyTo({ center: coords, zoom: 15, duration: 1000 });
@@ -332,6 +416,9 @@ export default function BuyerSearchResultsPage() {
           maximumFractionDigits: 0,
         }).format(property.estimatedPrice)
       : 'N/A';
+    const matchLevel = getMatchLabel(property.rankScore);
+    const matchColor =
+      matchLevel === 'Strong match' ? '#16a34a' : matchLevel === 'High match' ? '#2563eb' : '#64748b';
 
     return `
       <div style="padding: 0.5rem; min-width: 200px;">
@@ -343,14 +430,15 @@ export default function BuyerSearchResultsPage() {
           <span>${property.area} m²</span>
           ${property.bedrooms > 0 ? `<span>•</span><span>${property.bedrooms} bed</span>` : ''}
         </div>
-        <div style="font-size: 0.75rem; color: #999; margin-top: 0.5rem;">
-          Match Score: <strong>${property.rankScore.toFixed(1)}/100</strong> (Budget: ${property.budgetScore.toFixed(1)}/70, Bedrooms: ${property.bedroomScore.toFixed(1)}/30)
+        <div style="font-size: 0.875rem; font-weight: 600; margin-top: 0.5rem; color: ${matchColor};">
+          ${matchLevel}
         </div>
       </div>
     `;
   };
 
   const handlePropertyClick = (property: RankedProperty) => {
+    recordEngagementClick(property.propertyId);
     setSelectedPropertyId(property.propertyId);
     const lat = Number(property.latitude);
     const lng = Number(property.longitude);
@@ -429,7 +517,7 @@ export default function BuyerSearchResultsPage() {
         <p className={styles.subtitle}>
           Found {properties.length} {properties.length === 1 ? 'property' : 'properties'} matching your criteria
           {searchCriteria && (
-            <> • {searchCriteria.propertyType} • {searchCriteria.cityInseeCode} • Section {searchCriteria.cadastralSection}</>
+            <> • {searchCriteria.propertyType} • {searchCriteria.cityInseeCode}{searchCriteria.cadastralSection ? ` • Section ${searchCriteria.cadastralSection}` : ' • All sections'}</>
           )}
         </p>
       </div>
@@ -471,6 +559,32 @@ export default function BuyerSearchResultsPage() {
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                   </svg>
                 </button>
+                <button
+                  type="button"
+                  className={`${styles.interestedButton} ${
+                    interested[property.propertyId] ? styles.interestedActive : ''
+                  }`}
+                  onClick={(e) => toggleInterested(property.propertyId, e)}
+                  disabled={updatingInterested[property.propertyId]}
+                  title={interested[property.propertyId] ? 'Mark as not interested' : 'Mark as interested'}
+                >
+                  {interested[property.propertyId] ? (
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#16a34a"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  ) : (
+                    <span className={styles.interestedLabel}>Interested</span>
+                  )}
+                </button>
                 <div className={styles.propertyItemContent}>
                   <div className={styles.propertyAddress}>{property.address}</div>
                   <div className={styles.propertyDetails}>
@@ -485,8 +599,8 @@ export default function BuyerSearchResultsPage() {
                     )}
                   </div>
                   <div className={styles.propertyPrice}>{formatPrice(property.estimatedPrice)}</div>
-                  <div className={styles.propertyScore}>
-                    Match: <strong>{property.rankScore.toFixed(1)}/100</strong>
+                  <div className={`${styles.propertyScore} ${getMatchLevelClass(getMatchLabel(property.rankScore))}`}>
+                    {getMatchLabel(property.rankScore)}
                   </div>
                 </div>
               </div>

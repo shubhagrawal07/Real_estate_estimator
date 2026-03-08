@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import styles from './EstimateDisplay.module.css';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 
@@ -32,7 +33,7 @@ interface EstimateDisplayProps {
   loading: boolean;
 }
 
-export default function EstimateDisplay({ estimate, onRecalculate, loading }: EstimateDisplayProps) {
+function EstimateDisplay({ estimate, onRecalculate, loading }: EstimateDisplayProps) {
   const formatPrice = (price?: number) => {
     if (!price) return 'N/A';
     return new Intl.NumberFormat('en-US', {
@@ -154,3 +155,4 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
   );
 }
 
+export default React.memo(EstimateDisplay);

@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { config } from '../../config/env';
 import { UserRepo } from '../user/user.repo';
 import { User } from '../user/user.model';
+import { AppError } from '../../utils/AppError';
 
 export interface GoogleTokenPayload {
   sub: string; // Google user ID
@@ -39,7 +40,7 @@ export class AuthService {
         picture: payload.picture,
       };
     } catch (error) {
-      throw new Error('Invalid Google token');
+      throw new AppError('Invalid Google token', 401);
     }
   }
 
@@ -77,7 +78,7 @@ export class AuthService {
       };
       return decoded;
     } catch (error) {
-      throw new Error('Invalid or expired token');
+      throw new AppError('Invalid or expired token', 403);
     }
   }
 }

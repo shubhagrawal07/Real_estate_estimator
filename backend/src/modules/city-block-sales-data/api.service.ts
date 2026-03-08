@@ -6,6 +6,7 @@
 import { config } from '../../config/env';
 import { ApiResponse, FetchDataParams, SalesDataRecord } from './types';
 import { processResults } from './data-processor.service';
+import { logger } from '../../utils/logger';
 
 // ============================================================================
 // URL Building
@@ -123,44 +124,45 @@ export async function fetchAndProcessData(
     1
   );
 
-  console.log('[API] Starting data fetch', {
+  const apiLog = logger.child({ module: 'city-block-api' });
+  apiLog.info('Starting data fetch', {
     code_insee: params.code_insee,
     year_range: `${params.anneemut_min}-${params.anneemut_max}`,
   });
 
   let pageCount = 0;
 
-  // Fetch all pages
   while (currentUrl !== null) {
     pageCount++;
-    console.log(`[API] Fetching page ${pageCount}...`);
+    apiLog.info('Fetching page', { page: pageCount });
 
     try {
       const response: ApiResponse = await fetchApiData(currentUrl);
-
-      // Process results from this page
       const records = processResults(response.results);
       allRecords.push(...records);
 
-      console.log(`[API] Page ${pageCount} processed:`, {
+      apiLog.info('Page processed', {
+        page: pageCount,
         results_count: response.results.length,
         records_extracted: records.length,
         total_count: response.count,
       });
 
-      // Check for next page
       if (response.next) {
         currentUrl = response.next;
       } else {
         currentUrl = null;
       }
     } catch (error) {
-      console.error(`[API] Error fetching page ${pageCount}:`, error);
+      apiLog.error('Error fetching page', {
+        page: pageCount,
+        message: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
 
-  console.log('[API] Data fetch completed', {
+  apiLog.info('Data fetch completed', {
     total_pages: pageCount,
     total_records: allRecords.length,
   });

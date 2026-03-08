@@ -139,6 +139,46 @@
   animation: heartBeat 0.3s ease;
 }
 
+.interestedButton {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  background: transparent;
+  border: 1px solid #ccc;
+  color: #666;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.interestedButton:hover {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.interestedButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.interestedActive {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.interestedLabel {
+  white-space: nowrap;
+}
+
 @keyframes heartBeat {
   0% {
     transform: scale(1);
@@ -155,6 +195,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  padding-bottom: 2rem;
 }
 
 .propertyAddress {
@@ -183,13 +224,20 @@
 
 .propertyScore {
   font-size: 0.8rem;
-  color: #666;
+  font-weight: 600;
   margin-top: 0.25rem;
 }
 
-.propertyScore strong {
-  color: #667eea;
-  font-weight: 600;
+.propertyScore.matchStrong {
+  color: #16a34a;
+}
+
+.propertyScore.matchHigh {
+  color: #2563eb;
+}
+
+.propertyScore.matchPossible {
+  color: #64748b;
 }
 
 .mapContainer {
