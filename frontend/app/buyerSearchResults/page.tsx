@@ -240,6 +240,12 @@ export default function BuyerSearchResultsPage() {
     if (interestedInFlightRef.current.has(propertyId)) return;
     interestedInFlightRef.current.add(propertyId);
     setUpdatingInterested((prev) => ({ ...prev, [propertyId]: true }));
+
+    setInterested((prev) => ({
+      ...prev,
+      [propertyId]: !prev[propertyId],
+    }));
+
     try {
       const payload = {
         budget: Number.isFinite(Number(criteria.budget)) ? Number(criteria.budget) : 0,
@@ -256,14 +262,17 @@ export default function BuyerSearchResultsPage() {
         payload,
         token
       );
-      if (typeof result?.interested === 'boolean') {
-        setInterested((prev) => ({
-          ...prev,
-          [propertyId]: result.interested,
-        }));
+      const interested =
+        (result as { data?: { interested?: boolean } })?.data?.interested ??
+        (result as { interested?: boolean })?.interested;
+      if (typeof interested === 'boolean') {
+        setInterested((prev) => ({ ...prev, [propertyId]: interested }));
       }
     } catch {
-      // Leave local state unchanged on error; user can retry
+      setInterested((prev) => ({
+        ...prev,
+        [propertyId]: !prev[propertyId],
+      }));
     } finally {
       interestedInFlightRef.current.delete(propertyId);
       setUpdatingInterested((prev) => {
