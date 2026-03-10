@@ -1,3 +1,5 @@
+export type EstimateFeedback = 'accurate' | 'high' | 'low' | 'inaccurate';
+
 export interface PropertyEstimateResponse {
   propertyId: string;
   userId?: string;
@@ -14,6 +16,10 @@ export interface PropertyEstimateResponse {
   type: string;
   status?: string;
   createdDate?: string;
+  triggerPrice?: number;
+  engagementLevel?: number;
+  buyerTracking?: boolean;
+  feedback?: EstimateFeedback;
   apartmentDetails?: Record<string, unknown>;
   houseDetails?: Record<string, unknown>;
   [key: string]: unknown;

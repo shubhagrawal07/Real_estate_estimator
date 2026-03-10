@@ -194,7 +194,12 @@ export class PropertyEstimateRepo {
     return this.repository.save(estimate);
   }
 
-  async updatePrice(propertyId: string, basePricePerSqM: number, estimatedPrice: number): Promise<PropertyEstimate | null> {
+  async updatePrice(
+    propertyId: string,
+    basePricePerSqM: number,
+    estimatedPrice: number,
+    engagementIncrement?: number
+  ): Promise<PropertyEstimate | null> {
     const estimate = await this.findOne(propertyId);
     if (!estimate) {
       return null;
@@ -202,6 +207,9 @@ export class PropertyEstimateRepo {
 
     estimate.basePricePerSqM = basePricePerSqM;
     estimate.estimatedPrice = estimatedPrice;
+    if (engagementIncrement !== undefined) {
+      estimate.engagementLevel = (estimate.engagementLevel ?? 1) + engagementIncrement;
+    }
     return this.repository.save(estimate);
   }
 

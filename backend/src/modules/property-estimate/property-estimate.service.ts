@@ -77,6 +77,7 @@ export class PropertyEstimateService {
       basePricePerSqM,
       estimatedPrice,
       impressions: 0,
+      engagementLevel: 1,
       status: userId ? PropertyStatus.NEW : PropertyStatus.DRAFT,
       userId: userId || undefined,
     });
@@ -144,7 +145,7 @@ export class PropertyEstimateService {
 
     const { basePricePerSqM, estimatedPrice } =
       await this.valuationService.calculatePrice(dto);
-    return this.repo.updatePrice(propertyId, basePricePerSqM, estimatedPrice);
+    return this.repo.updatePrice(propertyId, basePricePerSqM, estimatedPrice, 5);
   }
 
   async deleteEstimate(propertyId: string): Promise<boolean> {
