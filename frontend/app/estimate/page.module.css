@@ -1,11 +1,12 @@
+/* Mobile-first: default = mobile */
 .main {
   min-height: 100vh;
   background: #f5f6fb;
-  padding: 2rem 1rem;
+  padding: 1rem;
 }
 
 .container {
-  max-width: 920px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -17,19 +18,19 @@
 }
 
 .title {
-  font-size: 2rem;
+  font-size: 1.75rem;
   margin-bottom: 0.5rem;
   color: #222;
 }
 
 .subtitle {
   color: #666;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .emptyState {
   background: white;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 12px;
   text-align: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -37,6 +38,8 @@
 
 .backLink {
   display: inline-block;
+  min-height: 2.75rem;
+  line-height: 2.75rem;
   margin-top: 1rem;
   color: #667eea;
   font-weight: 600;
@@ -48,7 +51,19 @@
     padding: 3rem 2rem;
   }
 
+  .container {
+    max-width: 920px;
+  }
+
   .title {
     font-size: 2.2rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  .emptyState {
+    padding: 2rem;
   }
 }

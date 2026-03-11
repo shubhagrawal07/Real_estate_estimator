@@ -1,19 +1,20 @@
+/* Mobile-first: default = mobile */
 .container {
-  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
 }
 
 .welcomeSection {
   text-align: center;
-  margin-bottom: 3rem;
-  padding: 2rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
   border-radius: 16px;
 }
 
 .welcomeTitle {
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
@@ -23,19 +24,20 @@
 }
 
 .welcomeSubtitle {
-  font-size: 1.25rem;
+  font-size: 1rem;
   color: #666;
   font-weight: 400;
   margin-bottom: 2rem;
 }
 
 .getEstimateButton {
+  min-height: 2.75rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 1rem 2.5rem;
+  padding: 0.875rem 2rem;
   border-radius: 12px;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
@@ -53,13 +55,13 @@
 
 .content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
   gap: 2rem;
 }
 
 .infoCard {
   background: white;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s, box-shadow 0.2s;
@@ -71,11 +73,10 @@
 }
 
 .cardTitle {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #333;
-  margin-bottom: 1rem;
   color: #667eea;
+  margin-bottom: 1rem;
 }
 
 .cardText {
@@ -84,21 +85,39 @@
   line-height: 1.6;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
+  .container {
+    max-width: 1200px;
+    padding: 2rem;
+  }
+
+  .welcomeSection {
+    margin-bottom: 3rem;
+    padding: 2rem;
+  }
+
   .welcomeTitle {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
   .welcomeSubtitle {
-    font-size: 1rem;
+    font-size: 1.25rem;
   }
 
   .getEstimateButton {
-    padding: 0.875rem 2rem;
-    font-size: 1rem;
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
   }
 
   .content {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .infoCard {
+    padding: 2rem;
+  }
+
+  .cardTitle {
+    font-size: 1.5rem;
   }
 }

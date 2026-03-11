@@ -1,16 +1,17 @@
+/* Mobile-first: default = mobile */
 .container {
-  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1.25rem 1rem;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .title {
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
@@ -20,7 +21,7 @@
 }
 
 .subtitle {
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: #666;
   font-weight: 400;
 }
@@ -34,14 +35,14 @@
 .formSection {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .resultSection {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   animation: slideIn 0.5s ease-out;
 }
@@ -53,6 +54,7 @@
 }
 
 .newEstimateButton {
+  min-height: 2.75rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
@@ -89,21 +91,26 @@
   text-align: center;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
   .container {
-    padding: 1rem;
+    max-width: 1200px;
+    padding: 2rem;
+  }
+
+  .header {
+    margin-bottom: 3rem;
   }
 
   .title {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
   .subtitle {
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
 
   .formSection,
   .resultSection {
-    padding: 1.5rem;
+    padding: 2rem;
   }
 }
