@@ -7,7 +7,9 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { favouritePropertyService } from '@/services/favourite-property.service';
 import { buyerEngagementService } from '@/services/buyer-engagement.service';
-import type { BuyerSearchCriteria } from '@/types/estimate';
+import Modal from '@/components/Modal';
+import { useBuyerChatbot, incrementBuyerSearchCount } from '@/hooks/useBuyerChatbot';
+import type { BuyerSearchCriteria, FinancingStatus } from '@/types/estimate';
 import styles from './page.module.css';
 
 const PROPERTIES_SOURCE_ID = 'properties';
@@ -118,6 +120,13 @@ export default function BuyerSearchResultsPage() {
   const searchCriteriaRef = useRef<BuyerSearchCriteria | null>(null);
   const interestedInFlightRef = useRef<Set<string>>(new Set());
 
+  const interestedCount = Object.values(interested).filter(Boolean).length;
+  const chatbot = useBuyerChatbot({
+    token: session?.backendToken,
+    searchCriteria,
+    interestedCount,
+  });
+
   useEffect(() => {
     searchCriteriaRef.current = searchCriteria;
   }, [searchCriteria]);
@@ -139,6 +148,7 @@ export default function BuyerSearchResultsPage() {
       setProperties(results);
       setSearchCriteria(criteria);
       setLoading(false);
+      incrementBuyerSearchCount();
       
       if (session?.backendToken && results.length > 0) {
         const ids = results.map((p: RankedProperty) => p.propertyId);
@@ -267,6 +277,9 @@ export default function BuyerSearchResultsPage() {
         (result as { interested?: boolean })?.interested;
       if (typeof interested === 'boolean') {
         setInterested((prev) => ({ ...prev, [propertyId]: interested }));
+        if (interested) {
+          chatbot.openFinancialStatus(propertyId);
+        }
       }
     } catch {
       setInterested((prev) => ({
@@ -619,6 +632,93 @@ export default function BuyerSearchResultsPage() {
 
         <div className={styles.mapContainer} ref={mapContainer} />
       </div>
+
+      <Modal
+        open={chatbot.showAlertPrompt}
+        onClose={chatbot.dismissAlertPrompt}
+        title="Save or mark interested to activate alert"
+        dismissLabel="Close"
+      >
+        <p className={styles.chatbotMessage}>
+          Save properties to your list or mark &quot;Interested&quot; to get alerts when something changes.
+        </p>
+        <button
+          type="button"
+          className={styles.chatbotPrimaryButton}
+          onClick={chatbot.dismissAlertPrompt}
+        >
+          Got it
+        </button>
+      </Modal>
+
+      <Modal
+        open={chatbot.showFinancialStatus}
+        onClose={chatbot.closeFinancialStatus}
+        title="What are your financial status?"
+        dismissLabel="Close"
+      >
+        <div className={styles.chatbotOptions}>
+          {(
+            [
+              { value: 'ready_to_buy' as FinancingStatus, label: 'Ready to buy' },
+              { value: 'in_progress' as FinancingStatus, label: 'In progress' },
+              { value: 'not_yet' as FinancingStatus, label: 'Not yet (just browsing)' },
+              { value: 'need_to_sell_first' as FinancingStatus, label: 'Need to sell first' },
+            ]
+          ).map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={styles.chatbotOptionButton}
+              onClick={() => chatbot.onFinancialStatusSelect(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal
+        open={chatbot.showScheduleCall}
+        onClose={() => chatbot.onScheduleCallSelect(false)}
+        title="A local specialist can help you decide"
+        dismissLabel="Close"
+      >
+        <div className={styles.chatbotOptions}>
+          <button
+            type="button"
+            className={styles.chatbotPrimaryButton}
+            onClick={() => chatbot.onScheduleCallSelect(true)}
+          >
+            Schedule a call with the agent
+          </button>
+          <button
+            type="button"
+            className={styles.chatbotOptionButton}
+            onClick={() => chatbot.onScheduleCallSelect(false)}
+          >
+            Not yet
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={chatbot.showScheduleCallConfirmed}
+        onClose={chatbot.closeScheduleCallConfirmed}
+        title="Agent will contact you soon…"
+        dismissLabel="Close"
+      >
+        <p className={styles.chatbotMessage}>
+          An agent will reach out to you shortly to help with your property search.
+        </p>
+        <button
+          type="button"
+          className={styles.chatbotPrimaryButton}
+          onClick={chatbot.closeScheduleCallConfirmed}
+        >
+          OK
+        </button>
+      </Modal>
     </div>
   );
 }

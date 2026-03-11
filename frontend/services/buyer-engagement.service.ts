@@ -2,6 +2,7 @@ import { api } from './api';
 import type {
   BuyerSearchCriteria,
   EngagementRecord,
+  FinancingStatus,
 } from '@/types/estimate';
 
 interface ApiResponse<T> {
@@ -27,7 +28,7 @@ export const buyerEngagementService = {
         pool: criteria.pool,
         minLandArea: criteria.minLandArea ?? null,
       }, token)
-      .then((res) => res.data),
+      .then((res) => (res as ApiResponse<EngagementRecord>).data),
 
   toggleInterested: (
     propertyId: string,
@@ -49,12 +50,26 @@ export const buyerEngagementService = {
         },
         token
       )
-      .then((res) => res.data),
+      .then((res) => (res as ApiResponse<EngagementRecord>).data),
 
   checkBatch: (propertyIds: string[], token: string) =>
     api
       .post<
         ApiResponse<{ engagements: Record<string, EngagementRecord> }>
       >('/buyer-engagement/batch/check', { propertyIds }, token)
-      .then((res) => res.data.engagements),
+      .then((res) => (res as ApiResponse<{ engagements: Record<string, EngagementRecord> }>).data.engagements),
+
+  updateFinancingStatus: (
+    propertyId: string,
+    financingStatus: FinancingStatus,
+    engagementDelta: number,
+    token: string
+  ) =>
+    api
+      .patch<ApiResponse<EngagementRecord>>(
+        `/buyer-engagement/${propertyId}/financing-status`,
+        { financingStatus, engagementDelta },
+        token
+      )
+      .then((res) => (res as ApiResponse<EngagementRecord>).data),
 };

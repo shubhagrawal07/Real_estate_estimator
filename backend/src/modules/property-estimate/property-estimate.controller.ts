@@ -73,3 +73,34 @@ export async function remove(req: AuthenticatedRequest, res: Response): Promise<
   }
   res.json({ message: 'Estimate deleted successfully' });
 }
+
+export async function updateEngagement(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = requireUserId(req);
+  const id = (req.params as { id: string }).id;
+  const body = req.body as {
+    feedback?: 'accurate' | 'high' | 'low' | 'inaccurate';
+    buyerTracking?: boolean;
+    triggerPrice?: number;
+    engagementDelta?: number;
+  };
+  const estimate = await propertyEstimateService.updateEngagement(id, userId, {
+    feedback: body.feedback,
+    buyerTracking: body.buyerTracking,
+    triggerPrice: body.triggerPrice,
+    engagementDelta: body.engagementDelta,
+  });
+  if (!estimate) {
+    throw new AppError('Estimate not found or access denied', 404);
+  }
+  res.json(serializeEstimate(estimate));
+}
+
+export async function getBuyerInterest(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const id = (req.params as { id: string }).id;
+  const estimate = await propertyEstimateService.findOne(id);
+  if (!estimate) {
+    throw new AppError('Estimate not found', 404);
+  }
+  const result = await propertyEstimateService.getBuyerInterest(id);
+  res.json(result);
+}

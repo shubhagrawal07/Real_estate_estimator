@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { BuyerEngagementService } from './buyer-engagement.service';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { AppError } from '../../utils/AppError';
-import type { ClickBody, InterestedToggleBody, BatchCheckBody } from './buyer-engagement.schemas';
+import type { ClickBody, InterestedToggleBody, BatchCheckBody, UpdateFinancingBody } from './buyer-engagement.schemas';
 
 const buyerEngagementService = new BuyerEngagementService();
 
@@ -65,5 +65,25 @@ export async function checkBatch(
   res.status(200).json({
     success: true,
     data: { engagements },
+  });
+}
+
+export async function updateFinancingStatus(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const userId = requireUserId(req);
+  const { propertyId } = req.params as { propertyId: string };
+  const body = req.body as UpdateFinancingBody;
+
+  const record = await buyerEngagementService.updateFinancingStatus(
+    userId,
+    propertyId,
+    body.financingStatus,
+    body.engagementDelta ?? 2
+  );
+  res.status(200).json({
+    success: true,
+    data: record,
   });
 }

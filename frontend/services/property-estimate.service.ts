@@ -1,5 +1,9 @@
 import { api } from './api';
-import type { PropertyEstimateResponse } from '@/types/estimate';
+import type {
+  PropertyEstimateResponse,
+  UpdateEngagementBody,
+  BuyerInterestResponse,
+} from '@/types/estimate';
 
 export const propertyEstimateService = {
   create: (body: unknown, token?: string | null) =>
@@ -23,4 +27,21 @@ export const propertyEstimateService = {
 
   delete: (id: string, token: string) =>
     api.delete<{ message: string }>(`/property-estimate/${id}`, token),
+
+  updateEngagement: (
+    propertyId: string,
+    body: UpdateEngagementBody,
+    token: string
+  ) =>
+    api.patch<PropertyEstimateResponse>(
+      `/property-estimate/${propertyId}/engagement`,
+      body,
+      token
+    ),
+
+  getBuyerInterest: (propertyId: string, token: string) =>
+    api.get<BuyerInterestResponse>(
+      `/property-estimate/${propertyId}/buyer-interest`,
+      token
+    ),
 };

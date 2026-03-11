@@ -166,4 +166,25 @@ export class BuyerEngagementService {
     }
     return result;
   }
+
+  async updateFinancingStatus(
+    userId: string,
+    propertyId: string,
+    financingStatus: string,
+    engagementDelta: number
+  ): Promise<EngagementRecord> {
+    const updated = await this.engagementRepo.updateFinancingStatusAndLevel(
+      userId,
+      propertyId,
+      financingStatus,
+      engagementDelta
+    );
+    if (!updated) {
+      throw new AppError('Engagement record not found', 404);
+    }
+    return {
+      engagementLevel: updated.engagementLevel,
+      interested: updated.interested,
+    };
+  }
 }

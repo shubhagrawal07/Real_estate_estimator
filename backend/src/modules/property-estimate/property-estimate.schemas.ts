@@ -65,3 +65,14 @@ export const idParamSchema = z.object({
 export const linkDraftsBodySchema = z.object({
   propertyIds: z.array(z.string()).min(1, 'Property IDs array is required'),
 });
+
+export const feedbackSchema = z.enum(['accurate', 'high', 'low', 'inaccurate']);
+
+export const updateEngagementBodySchema = z.object({
+  feedback: feedbackSchema.optional(),
+  buyerTracking: z.boolean().optional(),
+  triggerPrice: z.number().min(0).optional(),
+  engagementDelta: z.number().int().min(0).optional(),
+});
+
+export type UpdateEngagementBody = z.infer<typeof updateEngagementBodySchema>;

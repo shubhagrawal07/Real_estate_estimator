@@ -1,0 +1,79 @@
+/* Mobile-first modal */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal {
+  width: 100%;
+  max-width: 24rem;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--modal-bg, #fff);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .modal {
+    max-width: 28rem;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--modal-border, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--modal-title-color, #111);
+}
+
+.closeButton {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--modal-close-color, #6b7280);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  background: var(--modal-close-hover-bg, #f3f4f6);
+  color: var(--modal-close-hover-color, #111);
+  outline: none;
+}
+
+.body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}

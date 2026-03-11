@@ -1,4 +1,5 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
+import { BuyerEngagementRepo } from '../buyer-engagement/buyer-engagement.repo';
 import {
   PropertyEstimate,
   PropertyType,
@@ -59,10 +60,12 @@ export interface CreatePropertyEstimateDto {
 export class PropertyEstimateService {
   private repo: PropertyEstimateRepo;
   private valuationService: PropertyEstimateValuationService;
+  private buyerEngagementRepo: BuyerEngagementRepo;
 
   constructor() {
     this.repo = new PropertyEstimateRepo();
     this.valuationService = new PropertyEstimateValuationService();
+    this.buyerEngagementRepo = new BuyerEngagementRepo();
   }
 
   async createEstimate(
@@ -161,5 +164,23 @@ export class PropertyEstimateService {
     userId: string
   ): Promise<PropertyEstimate[]> {
     return this.repo.linkDraftEstimatesToUser(propertyIds, userId);
+  }
+
+  async updateEngagement(
+    propertyId: string,
+    userId: string,
+    data: {
+      feedback?: 'accurate' | 'high' | 'low' | 'inaccurate';
+      buyerTracking?: boolean;
+      triggerPrice?: number;
+      engagementDelta?: number;
+    }
+  ): Promise<PropertyEstimate | null> {
+    return this.repo.updateEngagement(propertyId, data, userId);
+  }
+
+  async getBuyerInterest(propertyId: string): Promise<{ hasHighBuyerInterest: boolean }> {
+    const maxLevel = await this.buyerEngagementRepo.getMaxEngagementLevelByPropertyId(propertyId);
+    return { hasHighBuyerInterest: maxLevel >= 10 };
   }
 }

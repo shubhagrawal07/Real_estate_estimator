@@ -1,6 +1,6 @@
 import { Repository, In, QueryRunner } from 'typeorm';
 import { AppDataSource } from '../../config/db';
-import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge } from './property-estimate.model';
+import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge, Feedback } from './property-estimate.model';
 import { ApartmentDetails, OutdoorSpace } from './entities/apartment-details.model';
 import { HouseDetails, PoolOption, ExteriorLayoutQuality } from './entities/house-details.model';
 import { CreatePropertyEstimateDto } from './property-estimate.service';
@@ -235,5 +235,40 @@ export class PropertyEstimateRepo {
     } finally {
       if (!queryRunner) await qr.release();
     }
+  }
+
+  async updateEngagement(
+    propertyId: string,
+    data: {
+      feedback?: string;
+      buyerTracking?: boolean;
+      triggerPrice?: number;
+      engagementDelta?: number;
+    },
+    userId?: string
+  ): Promise<PropertyEstimate | null> {
+    const estimate = await this.findOne(propertyId);
+    if (!estimate) return null;
+    if (userId != null && estimate.userId !== userId) return null;
+
+    if (data.feedback !== undefined) {
+      const feedbackMap: Record<string, Feedback> = {
+        accurate: Feedback.ACCURATE,
+        high: Feedback.HIGH,
+        low: Feedback.LOW,
+        inaccurate: Feedback.INACCURATE,
+      };
+      estimate.feedback = feedbackMap[data.feedback] ?? (data.feedback as Feedback);
+    }
+    if (data.buyerTracking !== undefined) {
+      estimate.buyerTracking = data.buyerTracking;
+    }
+    if (data.triggerPrice !== undefined) {
+      estimate.triggerPrice = data.triggerPrice;
+    }
+    if (data.engagementDelta !== undefined && data.engagementDelta > 0) {
+      estimate.engagementLevel = (estimate.engagementLevel ?? 1) + data.engagementDelta;
+    }
+    return this.repository.save(estimate);
   }
 }

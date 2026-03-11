@@ -178,6 +178,42 @@ export class BuyerEngagementRepo {
       if (!queryRunner) await qr.release();
     }
   }
+
+  async updateFinancingStatusAndLevel(
+    userId: string,
+    propertyId: string,
+    financingStatus: string,
+    engagementDelta: number
+  ): Promise<BuyerEngagement | null> {
+    const qr = AppDataSource.createQueryRunner();
+    await qr.connect();
+    try {
+      const result = await qr.query(
+        `UPDATE buyer_engagement
+         SET financing_status = $1,
+             engagement_level = GREATEST(0, engagement_level + $2)
+         WHERE user_id = $3 AND property_id = $4
+         RETURNING *`,
+        [financingStatus, engagementDelta, userId, propertyId]
+      );
+      const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] })?.rows;
+      const raw = rows?.[0] as Record<string, unknown> | undefined;
+      if (!raw) return null;
+      return this.repository.create(mapEngagementRowToEntity(raw));
+    } finally {
+      await qr.release();
+    }
+  }
+
+  async getMaxEngagementLevelByPropertyId(propertyId: string): Promise<number> {
+    const q = await this.repository
+      .createQueryBuilder('e')
+      .select('MAX(e.engagementLevel)', 'maxLevel')
+      .where('e.propertyId = :propertyId', { propertyId })
+      .getRawOne<{ maxLevel: string | null }>();
+    const max = q?.maxLevel != null ? Number(q.maxLevel) : 0;
+    return Number.isFinite(max) ? max : 0;
+  }
 }
 
 function mapEngagementRowToEntity(
@@ -191,5 +227,6 @@ function mapEngagementRowToEntity(
     landArea: (raw.land_area as number) ?? (raw.landArea as number),
     userId: raw.user_id ?? raw.userId,
     propertyId: raw.property_id ?? raw.propertyId,
+    financingStatus: (raw.financing_status as string) ?? (raw.financingStatus as string),
   } as Partial<BuyerEngagement>;
 }

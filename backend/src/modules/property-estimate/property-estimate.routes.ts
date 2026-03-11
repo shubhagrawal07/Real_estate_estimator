@@ -9,10 +9,12 @@ import {
   findOne,
   recalculate,
   remove,
+  updateEngagement,
+  getBuyerInterest,
 } from './property-estimate.controller';
 import { asyncHandler } from '../../middleware/error.middleware';
 import { validateBody, validateParams } from '../../middleware/validate-zod.middleware';
-import { idParamSchema, linkDraftsBodySchema } from './property-estimate.schemas';
+import { idParamSchema, linkDraftsBodySchema, updateEngagementBodySchema } from './property-estimate.schemas';
 
 const router = Router();
 
@@ -23,5 +25,18 @@ router.get('/', asyncHandler(findAll));
 router.put('/:id/recalculate', validateParams(idParamSchema), asyncHandler(recalculate));
 router.get('/:id', validateParams(idParamSchema), asyncHandler(findOne));
 router.delete('/:id', authenticateToken, validateParams(idParamSchema), asyncHandler(remove));
+router.patch(
+  '/:id/engagement',
+  authenticateToken,
+  validateParams(idParamSchema),
+  validateBody(updateEngagementBodySchema),
+  asyncHandler(updateEngagement)
+);
+router.get(
+  '/:id/buyer-interest',
+  authenticateToken,
+  validateParams(idParamSchema),
+  asyncHandler(getBuyerInterest)
+);
 
 export default router;

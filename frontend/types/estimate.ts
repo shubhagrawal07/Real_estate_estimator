@@ -70,3 +70,20 @@ export interface EngagementClickPayload {
 export interface BatchEngagementsResponse {
   engagements: Record<string, EngagementRecord>;
 }
+
+export interface UpdateEngagementBody {
+  feedback?: EstimateFeedback;
+  buyerTracking?: boolean;
+  triggerPrice?: number;
+  engagementDelta?: number;
+}
+
+export interface BuyerInterestResponse {
+  hasHighBuyerInterest: boolean;
+}
+
+export type FinancingStatus =
+  | 'ready_to_buy'
+  | 'in_progress'
+  | 'not_yet'
+  | 'need_to_sell_first';

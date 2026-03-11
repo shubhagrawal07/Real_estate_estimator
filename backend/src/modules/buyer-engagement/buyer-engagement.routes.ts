@@ -4,6 +4,7 @@ import {
   recordClick,
   toggleInterested,
   checkBatch,
+  updateFinancingStatus,
 } from './buyer-engagement.controller';
 import { asyncHandler } from '../../middleware/error.middleware';
 import {
@@ -15,6 +16,7 @@ import {
   propertyIdParamSchema,
   interestedToggleBodySchema,
   batchCheckBodySchema,
+  updateFinancingBodySchema,
 } from './buyer-engagement.schemas';
 
 const router = Router();
@@ -37,6 +39,13 @@ router.post(
   validateParams(propertyIdParamSchema),
   validateBody(interestedToggleBodySchema),
   asyncHandler(toggleInterested)
+);
+router.patch(
+  '/:propertyId/financing-status',
+  authenticateToken,
+  validateParams(propertyIdParamSchema),
+  validateBody(updateFinancingBodySchema),
+  asyncHandler(updateFinancingStatus)
 );
 
 export default router;
