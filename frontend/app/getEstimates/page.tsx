@@ -59,10 +59,15 @@ export default function GetEstimatesPage() {
 
   useEffect(() => {
     if (!estimate?.propertyId || !token) return;
-    propertyEstimateService
-      .getBuyerInterest(estimate.propertyId, token)
-      .then((res) => setHasHighBuyerInterest(res.hasHighBuyerInterest))
-      .catch(() => setHasHighBuyerInterest(false));
+    const fetchBuyerInterest = () => {
+      propertyEstimateService
+        .getBuyerInterest(estimate.propertyId, token)
+        .then((res) => setHasHighBuyerInterest(res.hasHighBuyerInterest))
+        .catch(() => setHasHighBuyerInterest(false));
+    };
+    fetchBuyerInterest();
+    const interval = setInterval(fetchBuyerInterest, 20_000);
+    return () => clearInterval(interval);
   }, [estimate?.propertyId, token]);
 
   const sellerChatbot = useSellerChatbot({

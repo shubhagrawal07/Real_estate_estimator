@@ -5,6 +5,7 @@ import {
   toggleInterested,
   checkBatch,
   updateFinancingStatus,
+  resetEngagementHandler,
 } from './buyer-engagement.controller';
 import { asyncHandler } from '../../middleware/error.middleware';
 import {
@@ -46,6 +47,12 @@ router.patch(
   validateParams(propertyIdParamSchema),
   validateBody(updateFinancingBodySchema),
   asyncHandler(updateFinancingStatus)
+);
+router.patch(
+  '/:propertyId/reset-engagement',
+  authenticateToken,
+  validateParams(propertyIdParamSchema),
+  asyncHandler(resetEngagementHandler)
 );
 
 export default router;

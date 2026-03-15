@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
+import Modal from '@/components/Modal';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyEstimates';
+import { useSellerChatbot } from '@/hooks/useSellerChatbot';
 import { propertyEstimateService } from '@/services/property-estimate.service';
 import { favouritePropertyService } from '@/services/favourite-property.service';
+import type { EstimateFeedback } from '@/types/estimate';
 import styles from './page.module.css';
 
 interface PropertyEstimate {
@@ -30,6 +33,44 @@ interface PropertyEstimate {
   basePricePerSqM?: number;
   status: string;
   createdDate: string;
+  engagementLevel?: number;
+}
+
+function SellerPriceEntryForm({
+  onSubmit,
+  onSkip,
+}: {
+  onSubmit: (price: number) => void;
+  onSkip: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const num = Number(value.replace(/\s/g, '').replace(/,/g, ''));
+    if (Number.isFinite(num) && num > 0) {
+      onSubmit(num);
+    }
+  };
+  return (
+    <form onSubmit={handleSubmit} className={styles.priceEntryForm}>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="e.g. 250000"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className={styles.priceEntryInput}
+      />
+      <div className={styles.chatbotOptions}>
+        <button type="submit" className={styles.chatbotPrimaryButton}>
+          Submit
+        </button>
+        <button type="button" className={styles.chatbotOptionButton} onClick={onSkip}>
+          Skip
+        </button>
+      </div>
+    </form>
+  );
 }
 
 type TabType = 'estimates' | 'favourites';
@@ -58,8 +99,28 @@ export default function MyEstimatesPage() {
     show: false,
     propertyId: null,
   });
+  const [hasHighBuyerInterest, setHasHighBuyerInterest] = useState(false);
 
   const error = activeTab === 'estimates' ? errorEstimates : errorFavourites;
+
+  useEffect(() => {
+    if (!selectedEstimate?.propertyId || !token) {
+      setHasHighBuyerInterest(false);
+      return;
+    }
+    propertyEstimateService
+      .getBuyerInterest(selectedEstimate.propertyId, token)
+      .then((res) => setHasHighBuyerInterest(res.hasHighBuyerInterest))
+      .catch(() => setHasHighBuyerInterest(false));
+  }, [selectedEstimate?.propertyId, token]);
+
+  const sellerChatbot = useSellerChatbot({
+    propertyId: selectedEstimate?.propertyId ?? '',
+    estimate: selectedEstimate ?? null,
+    hasHighBuyerInterest,
+    token,
+    onlyShowIfEngagementLevelAbove: 10,
+  });
 
   useEffect(() => {
     if (token) {
@@ -101,10 +162,11 @@ export default function MyEstimatesPage() {
     setLoading(true);
     try {
       const data = await propertyEstimateService.recalculate(selectedEstimate.propertyId);
-      setSelectedEstimate(data as unknown as PropertyEstimate);
+      const updated = { ...data } as PropertyEstimate;
+      setSelectedEstimate(updated);
       setEstimates(
         estimates.map((e) =>
-          e.propertyId === data.propertyId ? (data as unknown as PropertyEstimate) : e
+          e.propertyId === data.propertyId ? updated : e
         ) as EstimateItem[]
       );
     } catch {
@@ -348,6 +410,108 @@ export default function MyEstimatesPage() {
           </div>
         </div>
       )}
+
+      {/* Seller chatbot modals (when recalculate returns engagementLevel > 10) */}
+      <Modal
+        open={sellerChatbot.showFeedback}
+        onClose={sellerChatbot.closeModal}
+        title="How does this estimation feel?"
+        dismissLabel="Close"
+      >
+        <div className={styles.chatbotOptions}>
+          {(
+            [
+              { value: 'accurate' as EstimateFeedback, label: 'Accurate' },
+              { value: 'high' as EstimateFeedback, label: 'A bit high' },
+              { value: 'low' as EstimateFeedback, label: 'A bit low' },
+              { value: 'inaccurate' as EstimateFeedback, label: 'Not accurate' },
+            ]
+          ).map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={styles.chatbotOptionButton}
+              onClick={() => sellerChatbot.onFeedbackSelect(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Modal>
+      <Modal
+        open={sellerChatbot.showTrackDemand}
+        onClose={sellerChatbot.closeModal}
+        title="Would you like to track buyer demand anonymously?"
+        dismissLabel="Close"
+      >
+        <div className={styles.chatbotOptions}>
+          <button
+            type="button"
+            className={styles.chatbotPrimaryButton}
+            onClick={() => sellerChatbot.onTrackDemandSelect(true)}
+          >
+            Yes
+          </button>
+          <button
+            type="button"
+            className={styles.chatbotOptionButton}
+            onClick={() => sellerChatbot.onTrackDemandSelect(false)}
+          >
+            No
+          </button>
+        </div>
+      </Modal>
+      <Modal
+        open={sellerChatbot.showPriceEntry}
+        onClose={sellerChatbot.closeModal}
+        title="At what price would you seriously consider selling?"
+        dismissLabel="Close"
+      >
+        <SellerPriceEntryForm
+          onSubmit={sellerChatbot.onPriceSubmit}
+          onSkip={sellerChatbot.onPriceSkip}
+        />
+      </Modal>
+      <Modal
+        open={sellerChatbot.showScheduleCall}
+        onClose={() => sellerChatbot.onScheduleCallSelect(false)}
+        title="A local specialist can help you decide"
+        dismissLabel="Close"
+      >
+        <div className={styles.chatbotOptions}>
+          <button
+            type="button"
+            className={styles.chatbotPrimaryButton}
+            onClick={() => sellerChatbot.onScheduleCallSelect(true)}
+          >
+            Schedule a call with the agent
+          </button>
+          <button
+            type="button"
+            className={styles.chatbotOptionButton}
+            onClick={() => sellerChatbot.onScheduleCallSelect(false)}
+          >
+            Not yet
+          </button>
+        </div>
+      </Modal>
+      <Modal
+        open={sellerChatbot.showScheduleCallConfirmed}
+        onClose={sellerChatbot.closeScheduleCallConfirmed}
+        title="Agent will contact you soon…"
+        dismissLabel="Close"
+      >
+        <p className={styles.chatbotMessage}>
+          An agent will reach out to you shortly to help with your property.
+        </p>
+        <button
+          type="button"
+          className={styles.chatbotPrimaryButton}
+          onClick={sellerChatbot.closeScheduleCallConfirmed}
+        >
+          OK
+        </button>
+      </Modal>
     </div>
   );
 }

@@ -13,6 +13,8 @@ export interface UseSellerChatbotOptions {
   estimate: PropertyEstimateResponse | null;
   hasHighBuyerInterest: boolean;
   token: string | undefined;
+  /** When set (e.g. 10), only show feedback popup when estimate.engagementLevel > this value. Used on My Estimates after recalculate. */
+  onlyShowIfEngagementLevelAbove?: number;
 }
 
 export type SellerChatbotStep =
@@ -44,10 +46,12 @@ export function useSellerChatbot({
   estimate,
   hasHighBuyerInterest,
   token,
+  onlyShowIfEngagementLevelAbove,
 }: UseSellerChatbotOptions): UseSellerChatbotReturn {
   const [step, setStep] = useState<SellerChatbotStep>(null);
   const [showScheduleCallConfirmed, setShowScheduleCallConfirmed] = useState(false);
   const feedbackShownRef = useRef(false);
+  const prevEngagementLevelRef = useRef<number | undefined>(undefined);
 
   const showFeedback = step === 'feedback';
   const showTrackDemand = step === 'track_demand';
@@ -56,10 +60,26 @@ export function useSellerChatbot({
   const showScheduleCallConfirmedState =
     step === 'schedule_call_confirmed' || showScheduleCallConfirmed;
 
+  const FEEDBACK_POPUP_DELAY_MS = 7000;
+
   useEffect(() => {
-    if (!estimate?.propertyId || feedbackShownRef.current) return;
-    setStep('feedback');
-  }, [estimate?.propertyId]);
+    if (!estimate?.propertyId) return;
+    const level = estimate?.engagementLevel ?? 0;
+    const threshold = onlyShowIfEngagementLevelAbove ?? -1;
+    if (threshold >= 0 && level < threshold) {
+      prevEngagementLevelRef.current = level;
+      return;
+    }
+    if (threshold >= 0 && (prevEngagementLevelRef.current ?? 0) < threshold && level >= threshold) {
+      feedbackShownRef.current = false;
+    }
+    prevEngagementLevelRef.current = level;
+    if (feedbackShownRef.current) return;
+    const timer = setTimeout(() => {
+      setStep('feedback');
+    }, FEEDBACK_POPUP_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [estimate?.propertyId, estimate?.engagementLevel, onlyShowIfEngagementLevelAbove]);
 
   const closeModal = useCallback(() => {
     setStep(null);

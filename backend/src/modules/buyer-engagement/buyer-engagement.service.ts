@@ -43,10 +43,7 @@ export class BuyerEngagementService {
       if (!updated) {
         throw new AppError('Failed to update engagement', 500);
       }
-      return {
-        engagementLevel: updated.engagementLevel,
-        interested: updated.interested,
-      };
+      return updated;
     }
     const created = await this.engagementRepo.create({
       userId,
@@ -58,8 +55,8 @@ export class BuyerEngagementService {
       pool: criteria.pool ?? false,
     });
     return {
-      engagementLevel: created.engagementLevel,
-      interested: created.interested,
+      engagementLevel: Number(created.engagementLevel) || 1,
+      interested: Boolean(created.interested),
     };
   }
 
@@ -111,30 +108,48 @@ export class BuyerEngagementService {
       }
 
       const newInterested = !existing.interested;
-      const levelDelta = newInterested ? 10 : -10;
 
-      const updated = await this.engagementRepo.updateInterestedLevelAndCriteria(
+      if (newInterested) {
+        // Delete existing record then recreate so we always have a fresh record with current criteria
+        await this.engagementRepo.deleteByUserAndProperty(
+          userId,
+          propertyId,
+          queryRunner
+        );
+        const created = await this.engagementRepo.createWithTransaction(
+          {
+            userId,
+            propertyId,
+            ...criteriaPayload,
+            engagementLevel: 11,
+            interested: true,
+          },
+          queryRunner
+        );
+        await this.propertyRepo.incrementImpressions(
+          propertyId,
+          1,
+          queryRunner
+        );
+        await queryRunner.commitTransaction();
+        return {
+          engagementLevel: created.engagementLevel,
+          interested: created.interested,
+        };
+      }
+
+      await this.engagementRepo.deleteByUserAndProperty(
         userId,
         propertyId,
-        newInterested,
-        levelDelta,
-        criteriaPayload,
         queryRunner
       );
-      if (!updated) {
-        await queryRunner.rollbackTransaction();
-        throw new AppError('Failed to update engagement', 500);
-      }
       await this.propertyRepo.incrementImpressions(
         propertyId,
-        newInterested ? 1 : -1,
+        -1,
         queryRunner
       );
       await queryRunner.commitTransaction();
-      return {
-        engagementLevel: updated.engagementLevel,
-        interested: updated.interested,
-      };
+      return { engagementLevel: 0, interested: false };
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -181,6 +196,18 @@ export class BuyerEngagementService {
     );
     if (!updated) {
       throw new AppError('Engagement record not found', 404);
+    }
+    return {
+      engagementLevel: updated.engagementLevel,
+      interested: updated.interested,
+    };
+  }
+
+  /** Set engagement level to 0 for this user+property (keeps record; when closing popup or selecting In progress / Not yet / Need to sell first). */
+  async resetEngagement(userId: string, propertyId: string): Promise<EngagementRecord> {
+    const updated = await this.engagementRepo.setEngagementLevelToZero(userId, propertyId);
+    if (!updated) {
+      return { engagementLevel: 0, interested: false };
     }
     return {
       engagementLevel: updated.engagementLevel,

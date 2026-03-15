@@ -72,4 +72,13 @@ export const buyerEngagementService = {
         token
       )
       .then((res) => (res as ApiResponse<EngagementRecord>).data),
+
+  resetEngagement: (propertyId: string, token: string) =>
+    api
+      .patch<ApiResponse<EngagementRecord>>(
+        `/buyer-engagement/${propertyId}/reset-engagement`,
+        {},
+        token
+      )
+      .then((res) => (res as ApiResponse<EngagementRecord>).data),
 };

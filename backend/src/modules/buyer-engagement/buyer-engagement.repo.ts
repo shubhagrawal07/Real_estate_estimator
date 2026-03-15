@@ -73,23 +73,25 @@ export class BuyerEngagementRepo {
     propertyId: string,
     delta: number,
     queryRunner?: QueryRunner
-  ): Promise<BuyerEngagement | null> {
+  ): Promise<{ engagementLevel: number; interested: boolean } | null> {
     const qr = queryRunner ?? AppDataSource.createQueryRunner();
     if (!queryRunner) await qr.connect();
     try {
-      const result = await qr.query(
+      await qr.query(
         `UPDATE buyer_engagement
          SET engagement_level = engagement_level + $1
-         WHERE user_id = $2 AND property_id = $3
-         RETURNING *`,
+         WHERE user_id = $2 AND property_id = $3`,
         [delta, userId, propertyId]
       );
-      const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows;
-      const raw = rows?.[0] as Record<string, unknown> | undefined;
-      if (!raw) return null;
-      return this.repository.create(
-        mapEngagementRowToEntity(raw)
-      );
+      const repo = queryRunner ? qr.manager.getRepository(BuyerEngagement) : this.repository;
+      const entity = await repo.findOne({
+        where: { userId, propertyId },
+      });
+      if (!entity) return null;
+      return {
+        engagementLevel: Number(entity.engagementLevel) || 0,
+        interested: Boolean(entity.interested),
+      };
     } finally {
       if (!queryRunner) await qr.release();
     }
@@ -202,6 +204,54 @@ export class BuyerEngagementRepo {
       return this.repository.create(mapEngagementRowToEntity(raw));
     } finally {
       await qr.release();
+    }
+  }
+
+  /** Set engagement_level to 0 for this user+property (keeps record; used when closing popup or selecting non-ready options). */
+  async setEngagementLevelToZero(
+    userId: string,
+    propertyId: string,
+    queryRunner?: QueryRunner
+  ): Promise<BuyerEngagement | null> {
+    const qr = queryRunner ?? AppDataSource.createQueryRunner();
+    if (!queryRunner) await qr.connect();
+    try {
+      const result = await qr.query(
+        `UPDATE buyer_engagement
+         SET engagement_level = 0
+         WHERE user_id = $1 AND property_id = $2
+         RETURNING *`,
+        [userId, propertyId]
+      );
+      const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows;
+      const raw = rows?.[0] as Record<string, unknown> | undefined;
+      if (!raw) return null;
+      return this.repository.create(
+        mapEngagementRowToEntity(raw)
+      );
+    } finally {
+      if (!queryRunner) await qr.release();
+    }
+  }
+
+  /** Delete the engagement record for this user+property (used when clicking green tick to toggle not interested). */
+  async deleteByUserAndProperty(
+    userId: string,
+    propertyId: string,
+    queryRunner?: QueryRunner
+  ): Promise<boolean> {
+    const qr = queryRunner ?? AppDataSource.createQueryRunner();
+    if (!queryRunner) await qr.connect();
+    try {
+      const result = await qr.query(
+        `DELETE FROM buyer_engagement
+         WHERE user_id = $1 AND property_id = $2`,
+        [userId, propertyId]
+      );
+      const rowCount = (result as { rowCount?: number }).rowCount ?? 0;
+      return rowCount > 0;
+    } finally {
+      if (!queryRunner) await qr.release();
     }
   }
 

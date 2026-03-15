@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
@@ -118,7 +118,6 @@ export default function BuyerSearchResultsPage() {
   const [interested, setInterested] = useState<Record<string, boolean>>({});
   const [updatingInterested, setUpdatingInterested] = useState<Record<string, boolean>>({});
   const searchCriteriaRef = useRef<BuyerSearchCriteria | null>(null);
-  const interestedInFlightRef = useRef<Set<string>>(new Set());
 
   const interestedCount = Object.values(interested).filter(Boolean).length;
   const chatbot = useBuyerChatbot({
@@ -126,6 +125,15 @@ export default function BuyerSearchResultsPage() {
     searchCriteria,
     interestedCount,
   });
+
+  const openFinancialStatusRef = useRef(chatbot.openFinancialStatus);
+  openFinancialStatusRef.current = chatbot.openFinancialStatus;
+
+  const openFinancialModal = useCallback((propertyId: string) => {
+    requestAnimationFrame(() => {
+      openFinancialStatusRef.current(propertyId);
+    });
+  }, []);
 
   useEffect(() => {
     searchCriteriaRef.current = searchCriteria;
@@ -193,10 +201,14 @@ export default function BuyerSearchResultsPage() {
     const budget = Number(criteria.budget);
     const bedrooms = Number(criteria.bedrooms);
     const minSurfaceArea = Number(criteria.minSurfaceArea);
-    const minLandArea =
-      criteria.minLandArea != null && criteria.minLandArea !== ''
+    const minLandAreaRaw =
+      criteria.minLandArea != null && String(criteria.minLandArea).trim() !== ''
         ? Number(criteria.minLandArea)
-        : null;
+        : undefined;
+    const minLandArea =
+      minLandAreaRaw != null && Number.isFinite(minLandAreaRaw)
+        ? minLandAreaRaw
+        : undefined;
     buyerEngagementService
       .recordClick(
         propertyId,
@@ -205,11 +217,25 @@ export default function BuyerSearchResultsPage() {
           bedrooms: Number.isFinite(bedrooms) ? bedrooms : 0,
           minSurfaceArea: Number.isFinite(minSurfaceArea) ? minSurfaceArea : 0,
           pool: Boolean(criteria.pool),
-          minLandArea:
-            minLandArea != null && Number.isFinite(minLandArea) ? minLandArea : null,
+          minLandArea: minLandArea ?? undefined,
         },
         token
       )
+      .then((response) => {
+        const data =
+          response != null && typeof response === 'object' && 'data' in response
+            ? (response as { data: Record<string, unknown> }).data
+            : (response as unknown) as Record<string, unknown>;
+        const level =
+          typeof (data?.engagementLevel as number | undefined) === 'number'
+            ? (data.engagementLevel as number)
+            : typeof (data?.engagement_level as number | undefined) === 'number'
+              ? (data.engagement_level as number)
+              : Number(data?.engagementLevel ?? data?.engagement_level);
+        if (Number.isFinite(level) && level >= 10) {
+          setTimeout(() => openFinancialModal(propertyId), 50);
+        }
+      })
       .catch(() => {});
   };
 
@@ -247,8 +273,8 @@ export default function BuyerSearchResultsPage() {
     if (!token) return;
     const criteria = searchCriteriaRef.current;
     if (!criteria) return;
-    if (interestedInFlightRef.current.has(propertyId)) return;
-    interestedInFlightRef.current.add(propertyId);
+    if (updatingInterested[propertyId]) return;
+
     setUpdatingInterested((prev) => ({ ...prev, [propertyId]: true }));
 
     setInterested((prev) => ({
@@ -263,23 +289,28 @@ export default function BuyerSearchResultsPage() {
         minSurfaceArea: Number.isFinite(Number(criteria.minSurfaceArea)) ? Number(criteria.minSurfaceArea) : 0,
         pool: Boolean(criteria.pool),
         minLandArea:
-          criteria.minLandArea != null && criteria.minLandArea !== '' && Number.isFinite(Number(criteria.minLandArea))
+          criteria.minLandArea != null &&
+          String(criteria.minLandArea).trim() !== '' &&
+          Number.isFinite(Number(criteria.minLandArea))
             ? Number(criteria.minLandArea)
-            : null,
+            : undefined,
       };
       const result = await buyerEngagementService.toggleInterested(
         propertyId,
         payload,
         token
       );
-      const interested =
-        (result as { data?: { interested?: boolean } })?.data?.interested ??
-        (result as { interested?: boolean })?.interested;
-      if (typeof interested === 'boolean') {
-        setInterested((prev) => ({ ...prev, [propertyId]: interested }));
-        if (interested) {
-          chatbot.openFinancialStatus(propertyId);
-        }
+      const data = result != null && typeof result === 'object' && 'data' in result
+        ? (result as { data: { interested?: boolean } }).data
+        : (result as { interested?: boolean });
+      const isInterested = data?.interested === true;
+      setInterested((prev) => ({ ...prev, [propertyId]: isInterested }));
+      if (isInterested) {
+        openFinancialModal(propertyId);
+      }
+      const ids = properties.map((p) => p.propertyId);
+      if (ids.length > 0) {
+        loadEngagements(ids);
       }
     } catch {
       setInterested((prev) => ({
@@ -287,7 +318,6 @@ export default function BuyerSearchResultsPage() {
         [propertyId]: !prev[propertyId],
       }));
     } finally {
-      interestedInFlightRef.current.delete(propertyId);
       setUpdatingInterested((prev) => {
         const newState = { ...prev };
         delete newState[propertyId];
@@ -652,6 +682,7 @@ export default function BuyerSearchResultsPage() {
       </Modal>
 
       <Modal
+        key={`financial-${chatbot.financialModalKey}`}
         open={chatbot.showFinancialStatus}
         onClose={chatbot.closeFinancialStatus}
         title="What are your financial status?"

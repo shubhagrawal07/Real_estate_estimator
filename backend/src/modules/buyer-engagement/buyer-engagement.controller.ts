@@ -27,9 +27,14 @@ export async function recordClick(
     pool: body.pool,
     minLandArea: body.minLandArea,
   });
+  const level = Number(record.engagementLevel);
+  const interested = Boolean(record.interested);
   res.status(200).json({
     success: true,
-    data: record,
+    data: {
+      engagementLevel: Number.isFinite(level) ? level : 0,
+      interested,
+    },
   });
 }
 
@@ -82,6 +87,20 @@ export async function updateFinancingStatus(
     body.financingStatus,
     body.engagementDelta ?? 2
   );
+  res.status(200).json({
+    success: true,
+    data: record,
+  });
+}
+
+export async function resetEngagementHandler(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const userId = requireUserId(req);
+  const { propertyId } = req.params as { propertyId: string };
+
+  const record = await buyerEngagementService.resetEngagement(userId, propertyId);
   res.status(200).json({
     success: true,
     data: record,
