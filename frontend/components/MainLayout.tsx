@@ -72,8 +72,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
       const budget = alert.payload && typeof alert.payload.budget === 'number'
         ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(alert.payload.budget)
         : null;
-      const part = budget ? `Budget ${budget}` : 'A buyer';
-      return `${part} is above your trigger price${alert.address ? ` · ${alert.address}` : ''}`;
+      const budgetPart = budget ? `with budget ${budget} ` : '';
+      const base = `A new buyer arrived ${budgetPart}that might be interested in your property`;
+      return alert.address ? `${base}: ${alert.address}` : `${base}.`;
     }
     return alert.address ?? alert.propertyId;
   };
