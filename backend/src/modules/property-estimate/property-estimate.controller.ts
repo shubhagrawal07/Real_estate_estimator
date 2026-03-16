@@ -104,3 +104,10 @@ export async function getBuyerInterest(req: AuthenticatedRequest, res: Response)
   const result = await propertyEstimateService.getBuyerInterest(id);
   res.json(result);
 }
+
+export async function getPotentialBuyers(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = requireUserId(req);
+  const id = (req.params as { id: string }).id;
+  const list = await propertyEstimateService.getPotentialBuyers(id, userId);
+  res.json(list);
+}

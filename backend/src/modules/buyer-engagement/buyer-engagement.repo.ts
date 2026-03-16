@@ -12,6 +12,17 @@ export interface CreateBuyerEngagementData {
   pool: boolean;
 }
 
+/** Anonymous row for seller-facing potential buyers list (no userId or id). */
+export interface PotentialBuyerRow {
+  budget: number;
+  bedrooms: number;
+  surfaceMin: number;
+  landArea?: number | null;
+  pool: boolean;
+  engagementLevel: number;
+  interested: boolean;
+}
+
 export class BuyerEngagementRepo {
   private repository: Repository<BuyerEngagement>;
 
@@ -263,6 +274,35 @@ export class BuyerEngagementRepo {
       .getRawOne<{ maxLevel: string | null }>();
     const max = q?.maxLevel != null ? Number(q.maxLevel) : 0;
     return Number.isFinite(max) ? max : 0;
+  }
+
+  /** Anonymous list of buyer engagements for a property (seller-only). Sorted by engagement DESC, budget DESC. */
+  async findByPropertyIdAnonymous(propertyId: string): Promise<PotentialBuyerRow[]> {
+    const rows = await this.repository
+      .createQueryBuilder('e')
+      .select([
+        'e.budget',
+        'e.bedrooms',
+        'e.surfaceMin',
+        'e.landArea',
+        'e.pool',
+        'e.engagementLevel',
+        'e.interested',
+      ])
+      .where('e.propertyId = :propertyId', { propertyId })
+      .orderBy('e.engagementLevel', 'DESC')
+      .addOrderBy('e.budget', 'DESC')
+      .getMany();
+
+    return rows.map((e) => ({
+      budget: Number(e.budget),
+      bedrooms: Number(e.bedrooms),
+      surfaceMin: Number(e.surfaceMin),
+      landArea: e.landArea != null ? Number(e.landArea) : null,
+      pool: Boolean(e.pool),
+      engagementLevel: Number(e.engagementLevel),
+      interested: Boolean(e.interested),
+    }));
   }
 }
 

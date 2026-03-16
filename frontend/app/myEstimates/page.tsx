@@ -4,17 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
 import Modal from '@/components/Modal';
+import PotentialBuyersModal from '@/components/PotentialBuyersModal';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyEstimates';
 import { useSellerChatbot } from '@/hooks/useSellerChatbot';
 import { propertyEstimateService } from '@/services/property-estimate.service';
 import { favouritePropertyService } from '@/services/favourite-property.service';
-import type { EstimateFeedback } from '@/types/estimate';
+import type { EstimateFeedback, PropertyEstimateResponse } from '@/types/estimate';
 import styles from './page.module.css';
 
 interface PropertyEstimate {
   propertyId: string;
   address: string;
+  locationCode: string;
   postalCode: number;
   department: string;
   municipality: string;
@@ -34,6 +36,7 @@ interface PropertyEstimate {
   status: string;
   createdDate: string;
   engagementLevel?: number;
+  buyerTracking?: boolean;
 }
 
 function SellerPriceEntryForm({
@@ -99,6 +102,7 @@ export default function MyEstimatesPage() {
     show: false,
     propertyId: null,
   });
+  const [potentialBuyersPropertyId, setPotentialBuyersPropertyId] = useState<string | null>(null);
   const [hasHighBuyerInterest, setHasHighBuyerInterest] = useState(false);
 
   const error = activeTab === 'estimates' ? errorEstimates : errorFavourites;
@@ -116,7 +120,7 @@ export default function MyEstimatesPage() {
 
   const sellerChatbot = useSellerChatbot({
     propertyId: selectedEstimate?.propertyId ?? '',
-    estimate: selectedEstimate ?? null,
+    estimate: (selectedEstimate ?? null) as PropertyEstimateResponse | null,
     hasHighBuyerInterest,
     token,
     onlyShowIfEngagementLevelAbove: 10,
@@ -169,7 +173,7 @@ export default function MyEstimatesPage() {
     setLoading(true);
     try {
       const data = await propertyEstimateService.recalculate(selectedEstimate.propertyId);
-      const updated = { ...data } as PropertyEstimate;
+      const updated = { ...data } as unknown as PropertyEstimate;
       setSelectedEstimate(updated);
       setEstimates(
         estimates.map((e) =>
@@ -341,6 +345,18 @@ export default function MyEstimatesPage() {
                     >
                       🗺️ View on Map
                     </button>
+                    {activeTab === 'estimates' && Boolean((estimate as { buyerTracking?: boolean }).buyerTracking) && (
+                      <button
+                        className={styles.viewMapButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPotentialBuyersPropertyId(estimate.propertyId);
+                        }}
+                        title="View potential buyers"
+                      >
+                        Potential Buyers
+                      </button>
+                    )}
                     {activeTab === 'estimates' && (
                       <button
                         className={styles.deleteButton}
@@ -519,6 +535,12 @@ export default function MyEstimatesPage() {
           OK
         </button>
       </Modal>
+      <PotentialBuyersModal
+        open={potentialBuyersPropertyId !== null}
+        onClose={() => setPotentialBuyersPropertyId(null)}
+        propertyId={potentialBuyersPropertyId ?? ''}
+        token={token ?? undefined}
+      />
     </div>
   );
 }

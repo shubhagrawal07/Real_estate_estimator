@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { usePathname, useRouter } from 'next/navigation';
 import { propertyEstimateService } from '@/services/property-estimate.service';
+import { sellerAlertService } from '@/services/seller-alert.service';
+import type { SellerAlertItem } from '@/types/estimate';
 import styles from './MainLayout.module.css';
 
 interface MainLayoutProps {
@@ -17,6 +19,64 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [alerts, setAlerts] = useState<SellerAlertItem[]>([]);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsRef = useRef<HTMLDivElement>(null);
+
+  const token = session?.backendToken;
+
+  // Fetch seller alerts when logged in
+  useEffect(() => {
+    if (!token) {
+      setAlerts([]);
+      return;
+    }
+    sellerAlertService
+      .getAlerts(token)
+      .then((data) => setAlerts(Array.isArray(data) ? data : []))
+      .catch(() => setAlerts([]));
+  }, [token]);
+
+  const fetchAlerts = () => {
+    if (!token) return;
+    sellerAlertService
+      .getAlerts(token)
+      .then((data) => setAlerts(Array.isArray(data) ? data : []))
+      .catch(() => setAlerts([]));
+  };
+
+  // Close alerts dropdown when clicking outside
+  useEffect(() => {
+    if (!alertsOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (alertsRef.current && !alertsRef.current.contains(e.target as Node)) {
+        setAlertsOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [alertsOpen]);
+
+  const handleDismissAlert = async (id: string) => {
+    if (!token) return;
+    try {
+      await sellerAlertService.markAsRead(id, token);
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    } catch {
+      // Silent fail
+    }
+  };
+
+  const formatAlertMessage = (alert: SellerAlertItem): string => {
+    if (alert.type === 'buyer_above_trigger') {
+      const budget = alert.payload && typeof alert.payload.budget === 'number'
+        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(alert.payload.budget)
+        : null;
+      const part = budget ? `Budget ${budget}` : 'A buyer';
+      return `${part} is above your trigger price${alert.address ? ` · ${alert.address}` : ''}`;
+    }
+    return alert.address ?? alert.propertyId;
+  };
 
   // Handle responsive sidebar
   useEffect(() => {
@@ -34,13 +94,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const token = session?.backendToken;
-
   useEffect(() => {
-    if (session?.backendToken) {
+    if (token) {
       linkDraftEstimates();
     }
-  }, [session?.backendToken]);
+  }, [token]);
 
   const linkDraftEstimates = async () => {
     const draftEstimates = localStorage.getItem('draftEstimates');
@@ -103,11 +161,60 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </div>
         <div className={styles.headerRight}>
           <button className={styles.helpButton}>Help</button>
-          <button className={styles.notificationButton}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18 16V11C18 7.93 16.37 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.64 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.89 22 12 22Z" fill="currentColor"/>
-            </svg>
-          </button>
+          {session && (
+            <div className={styles.notificationWrap} ref={alertsRef}>
+              <button
+                type="button"
+                className={styles.notificationButton}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAlertsOpen((open) => {
+                    const next = !open;
+                    if (next) fetchAlerts();
+                    return next;
+                  });
+                }}
+                aria-label={alerts.length > 0 ? `${alerts.length} notifications` : 'Notifications'}
+                aria-expanded={alertsOpen}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 16V11C18 7.93 16.37 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.64 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.89 22 12 22Z" fill="currentColor"/>
+                </svg>
+                {alerts.length > 0 && (
+                  <span className={styles.notificationBadge} aria-hidden="true">
+                    {alerts.length > 99 ? '99+' : alerts.length}
+                  </span>
+                )}
+              </button>
+              {alertsOpen && (
+                <div className={styles.notificationDropdown}>
+                  <div className={styles.notificationDropdownHeader}>
+                    Notifications
+                  </div>
+                  {alerts.length === 0 ? (
+                    <p className={styles.notificationEmpty}>No new notifications</p>
+                  ) : (
+                    <ul className={styles.notificationList}>
+                      {alerts.map((alert) => (
+                        <li key={alert.id} className={styles.notificationItem}>
+                          <p className={styles.notificationMessage}>
+                            {formatAlertMessage(alert)}
+                          </p>
+                          <button
+                            type="button"
+                            className={styles.notificationDismiss}
+                            onClick={() => handleDismissAlert(alert.id)}
+                          >
+                            Dismiss
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {session ? (
             <>
               <button className={styles.loginButton} onClick={() => signOut()}>

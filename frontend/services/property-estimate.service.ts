@@ -3,6 +3,7 @@ import type {
   PropertyEstimateResponse,
   UpdateEngagementBody,
   BuyerInterestResponse,
+  PotentialBuyerEntry,
 } from '@/types/estimate';
 
 export const propertyEstimateService = {
@@ -42,6 +43,12 @@ export const propertyEstimateService = {
   getBuyerInterest: (propertyId: string, token: string) =>
     api.get<BuyerInterestResponse>(
       `/property-estimate/${propertyId}/buyer-interest`,
+      token
+    ),
+
+  getPotentialBuyers: (propertyId: string, token: string) =>
+    api.get<PotentialBuyerEntry[]>(
+      `/property-estimate/${propertyId}/potential-buyers`,
       token
     ),
 };

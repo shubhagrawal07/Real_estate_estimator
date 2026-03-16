@@ -1,6 +1,7 @@
 import { AppDataSource } from '../../config/db';
 import { BuyerEngagementRepo } from './buyer-engagement.repo';
 import { PropertyEstimateRepo } from '../property-estimate/property-estimate.repo';
+import { SellerAlertService } from '../seller-alert/seller-alert.service';
 import { AppError } from '../../utils/AppError';
 
 export interface EngagementCriteria {
@@ -19,10 +20,36 @@ export interface EngagementRecord {
 export class BuyerEngagementService {
   private engagementRepo: BuyerEngagementRepo;
   private propertyRepo: PropertyEstimateRepo;
+  private sellerAlertService: SellerAlertService;
 
   constructor() {
     this.engagementRepo = new BuyerEngagementRepo();
     this.propertyRepo = new PropertyEstimateRepo();
+    this.sellerAlertService = new SellerAlertService();
+  }
+
+  /** If property has buyerTracking and triggerPrice set and budget >= triggerPrice, create seller alert (at most one per property per day). */
+  private async maybeCreateTriggerPriceAlert(
+    propertyId: string,
+    budget: number
+  ): Promise<void> {
+    const property = await this.propertyRepo.findOne(propertyId);
+    if (
+      !property?.buyerTracking ||
+      property.triggerPrice == null ||
+      property.userId == null
+    ) {
+      return;
+    }
+    const triggerPrice = Number(property.triggerPrice);
+    if (!Number.isFinite(triggerPrice) || budget < triggerPrice) {
+      return;
+    }
+    await this.sellerAlertService.createBuyerAboveTriggerAlertIfNew(
+      propertyId,
+      property.userId,
+      budget
+    );
   }
 
   async recordClick(
@@ -54,6 +81,7 @@ export class BuyerEngagementService {
       landArea: criteria.minLandArea ?? null,
       pool: criteria.pool ?? false,
     });
+    await this.maybeCreateTriggerPriceAlert(propertyId, criteria.budget);
     return {
       engagementLevel: Number(created.engagementLevel) || 1,
       interested: Boolean(created.interested),
@@ -101,6 +129,7 @@ export class BuyerEngagementService {
           queryRunner
         );
         await queryRunner.commitTransaction();
+        await this.maybeCreateTriggerPriceAlert(propertyId, criteria.budget);
         return {
           engagementLevel: created.engagementLevel,
           interested: created.interested,
@@ -132,6 +161,7 @@ export class BuyerEngagementService {
           queryRunner
         );
         await queryRunner.commitTransaction();
+        await this.maybeCreateTriggerPriceAlert(propertyId, criteria.budget);
         return {
           engagementLevel: created.engagementLevel,
           interested: created.interested,

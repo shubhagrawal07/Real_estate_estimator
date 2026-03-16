@@ -8,6 +8,7 @@ import { Subscription } from '../modules/subscription/subscription.model';
 import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
 import { FavouriteProperty } from '../modules/favourite-property/favourite-property.model';
 import { BuyerEngagement } from '../modules/buyer-engagement/buyer-engagement.model';
+import { SellerAlert } from '../modules/seller-alert/seller-alert.model';
 import { config } from './env';
 import { logger } from '../utils/logger';
 
@@ -28,6 +29,7 @@ export const AppDataSource = new DataSource({
     CityBlockSalesData,
     FavouriteProperty,
     BuyerEngagement,
+    SellerAlert,
   ],
   synchronize: config.nodeEnv !== 'production',
 });

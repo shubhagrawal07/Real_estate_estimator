@@ -6,6 +6,7 @@ import PropertyEstimateForm, { type PropertyData } from '@/components/PropertyEs
 import EstimateResult from '@/components/EstimateResult';
 import LoadingScreen from '@/components/LoadingScreen';
 import Modal from '@/components/Modal';
+import PotentialBuyersModal from '@/components/PotentialBuyersModal';
 import { propertyEstimateService } from '@/services/property-estimate.service';
 import { useSellerChatbot } from '@/hooks/useSellerChatbot';
 import type { PropertyEstimateResponse, EstimateFeedback } from '@/types/estimate';
@@ -54,6 +55,7 @@ export default function GetEstimatesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasHighBuyerInterest, setHasHighBuyerInterest] = useState(false);
+  const [showPotentialBuyers, setShowPotentialBuyers] = useState(false);
 
   const token = session?.backendToken;
 
@@ -156,6 +158,15 @@ export default function GetEstimatesPage() {
               >
                 Create New Estimate
               </button>
+              {estimate.buyerTracking && token && (
+                <button
+                  type="button"
+                  className={styles.newEstimateButton}
+                  onClick={() => setShowPotentialBuyers(true)}
+                >
+                  Potential Buyers
+                </button>
+              )}
             </div>
             <EstimateResult estimate={estimate} />
 
@@ -263,6 +274,12 @@ export default function GetEstimatesPage() {
                 OK
               </button>
             </Modal>
+            <PotentialBuyersModal
+              open={showPotentialBuyers}
+              onClose={() => setShowPotentialBuyers(false)}
+              propertyId={estimate.propertyId}
+              token={token ?? undefined}
+            />
           </div>
         )}
       </div>

@@ -82,8 +82,29 @@ export interface BuyerInterestResponse {
   hasHighBuyerInterest: boolean;
 }
 
+/** Anonymous potential buyer entry (budget + matching criteria only). */
+export interface PotentialBuyerEntry {
+  budget: number;
+  bedrooms: number;
+  surfaceMin: number;
+  landArea?: number | null;
+  pool: boolean;
+  engagementLevel: number;
+  interested: boolean;
+}
+
 export type FinancingStatus =
   | 'ready_to_buy'
   | 'in_progress'
   | 'not_yet'
   | 'need_to_sell_first';
+
+export interface SellerAlertItem {
+  id: string;
+  type: string;
+  propertyId: string;
+  address?: string;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+  read: boolean;
+}
