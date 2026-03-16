@@ -75,6 +75,7 @@ export default function GetEstimatesPage() {
     estimate,
     hasHighBuyerInterest,
     token,
+    onEngagementUpdated: setEstimate,
   });
 
   const handleEstimate = async (propertyData: PropertyData) => {

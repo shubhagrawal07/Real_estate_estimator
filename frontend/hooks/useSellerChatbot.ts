@@ -4,9 +4,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { propertyEstimateService } from '@/services/property-estimate.service';
 import type { EstimateFeedback, PropertyEstimateResponse } from '@/types/estimate';
 
-const ENGAGEMENT_DELTA_FEEDBACK = 2;
-const ENGAGEMENT_DELTA_TRACKING = 2;
-const ENGAGEMENT_DELTA_TRIGGER_PRICE = 1;
+/** Every positive answer in create-property popups increases engagement by this amount. */
+const ENGAGEMENT_DELTA_FEEDBACK = 4;
+const ENGAGEMENT_DELTA_TRACKING = 4;
+const ENGAGEMENT_DELTA_TRIGGER_PRICE = 4;
+
+/** When engagement level reaches or crosses this value after an update, show schedule_call popup. */
+const ENGAGEMENT_THRESHOLD_SCHEDULE_CALL = 10;
 
 export interface UseSellerChatbotOptions {
   propertyId: string;
@@ -15,6 +19,8 @@ export interface UseSellerChatbotOptions {
   token: string | undefined;
   /** When set (e.g. 10), only show feedback popup when estimate.engagementLevel > this value. Used on My Estimates after recalculate. */
   onlyShowIfEngagementLevelAbove?: number;
+  /** Called when engagement is updated so parent can sync estimate state (e.g. setEstimate(updated)). */
+  onEngagementUpdated?: (updated: PropertyEstimateResponse) => void;
 }
 
 export type SellerChatbotStep =
@@ -41,12 +47,17 @@ export interface UseSellerChatbotReturn {
   closeModal: () => void;
 }
 
+function meetsScheduleCallThreshold(engagementLevel: number | undefined): boolean {
+  return (engagementLevel ?? 0) >= ENGAGEMENT_THRESHOLD_SCHEDULE_CALL;
+}
+
 export function useSellerChatbot({
   propertyId,
   estimate,
   hasHighBuyerInterest,
   token,
   onlyShowIfEngagementLevelAbove,
+  onEngagementUpdated,
 }: UseSellerChatbotOptions): UseSellerChatbotReturn {
   const [step, setStep] = useState<SellerChatbotStep>(null);
   const [showScheduleCallConfirmed, setShowScheduleCallConfirmed] = useState(false);
@@ -87,12 +98,14 @@ export function useSellerChatbot({
   }, []);
 
   const tryShowScheduleCall = useCallback(() => {
-    if (hasHighBuyerInterest) {
+    const showByInterest = hasHighBuyerInterest;
+    const showByThreshold = meetsScheduleCallThreshold(estimate?.engagementLevel);
+    if (showByInterest || showByThreshold) {
       setStep('schedule_call');
     } else {
       setStep(null);
     }
-  }, [hasHighBuyerInterest]);
+  }, [hasHighBuyerInterest, estimate?.engagementLevel]);
 
   const onFeedbackSelect = useCallback(
     (feedback: EstimateFeedback) => {
@@ -107,15 +120,20 @@ export function useSellerChatbot({
           { feedback, engagementDelta: ENGAGEMENT_DELTA_FEEDBACK },
           token
         )
-        .then(() => {
+        .then((updated) => {
           feedbackShownRef.current = true;
-          setStep('track_demand');
+          onEngagementUpdated?.(updated);
+          if (meetsScheduleCallThreshold(updated?.engagementLevel)) {
+            setStep('schedule_call');
+          } else {
+            setStep('track_demand');
+          }
         })
         .catch(() => {
           setStep('track_demand');
         });
     },
-    [propertyId, token]
+    [propertyId, token, onEngagementUpdated]
   );
 
   const onTrackDemandSelect = useCallback(
@@ -132,13 +150,20 @@ export function useSellerChatbot({
             { buyerTracking: true, engagementDelta: ENGAGEMENT_DELTA_TRACKING },
             token
           )
-          .then(() => setStep('price_entry'))
+          .then((updated) => {
+            onEngagementUpdated?.(updated);
+            if (meetsScheduleCallThreshold(updated?.engagementLevel)) {
+              setStep('schedule_call');
+            } else {
+              setStep('price_entry');
+            }
+          })
           .catch(() => setStep('price_entry'));
       } else {
         tryShowScheduleCall();
       }
     },
-    [propertyId, token, tryShowScheduleCall]
+    [propertyId, token, tryShowScheduleCall, onEngagementUpdated]
   );
 
   const onPriceSubmit = useCallback(
@@ -156,10 +181,17 @@ export function useSellerChatbot({
           },
           token
         )
-        .then(() => tryShowScheduleCall())
+        .then((updated) => {
+          onEngagementUpdated?.(updated);
+          if (meetsScheduleCallThreshold(updated?.engagementLevel)) {
+            setStep('schedule_call');
+          } else {
+            tryShowScheduleCall();
+          }
+        })
         .catch(() => tryShowScheduleCall());
     },
-    [propertyId, token, tryShowScheduleCall]
+    [propertyId, token, tryShowScheduleCall, onEngagementUpdated]
   );
 
   const onPriceSkip = useCallback(() => {

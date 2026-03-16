@@ -120,6 +120,13 @@ export default function MyEstimatesPage() {
     hasHighBuyerInterest,
     token,
     onlyShowIfEngagementLevelAbove: 10,
+    onEngagementUpdated: (updated) => {
+      setSelectedEstimate((prev) =>
+        prev && prev.propertyId === updated.propertyId
+          ? { ...prev, engagementLevel: updated.engagementLevel }
+          : prev
+      );
+    },
   });
 
   useEffect(() => {
