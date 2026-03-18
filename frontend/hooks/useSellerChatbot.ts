@@ -27,6 +27,7 @@ export type SellerChatbotStep =
   | 'feedback'
   | 'track_demand'
   | 'price_entry'
+  | 'thanks'
   | 'schedule_call'
   | 'schedule_call_confirmed'
   | null;
@@ -36,6 +37,7 @@ export interface UseSellerChatbotReturn {
   showFeedback: boolean;
   showTrackDemand: boolean;
   showPriceEntry: boolean;
+  showThanks: boolean;
   showScheduleCall: boolean;
   showScheduleCallConfirmed: boolean;
   onFeedbackSelect: (feedback: EstimateFeedback) => void;
@@ -45,9 +47,12 @@ export interface UseSellerChatbotReturn {
   onScheduleCallSelect: (schedule: boolean) => void;
   closeScheduleCallConfirmed: () => void;
   closeModal: () => void;
+  closeThanks: () => void;
 }
 
-function meetsScheduleCallThreshold(engagementLevel: number | undefined): boolean {
+function meetsScheduleCallThreshold(
+  engagementLevel: number | undefined
+): boolean {
   return (engagementLevel ?? 0) >= ENGAGEMENT_THRESHOLD_SCHEDULE_CALL;
 }
 
@@ -64,9 +69,68 @@ export function useSellerChatbot({
   const feedbackShownRef = useRef(false);
   const prevEngagementLevelRef = useRef<number | undefined>(undefined);
 
+  const pendingScheduleCallRef = useRef(false);
+  const scheduleCallTimerRef = useRef<number | null>(null);
+
+  const clearScheduleCallTimer = useCallback(() => {
+    if (scheduleCallTimerRef.current != null) {
+      window.clearTimeout(scheduleCallTimerRef.current);
+      scheduleCallTimerRef.current = null;
+    }
+  }, []);
+
+  const computeShouldScheduleCall = useCallback(
+    (engagementLevel: number | undefined): boolean => {
+      return hasHighBuyerInterest || meetsScheduleCallThreshold(engagementLevel);
+    },
+    [hasHighBuyerInterest]
+  );
+
+  const enterThanksFromEstimate = useCallback(
+    (currentEstimate: PropertyEstimateResponse | null | undefined) => {
+      pendingScheduleCallRef.current = computeShouldScheduleCall(
+        currentEstimate?.engagementLevel
+      );
+      setStep('thanks');
+    },
+    [computeShouldScheduleCall]
+  );
+
+  const advanceAfterAllAnswers = useCallback(
+    (currentEstimate: PropertyEstimateResponse | null | undefined) => {
+      clearScheduleCallTimer();
+      if (!currentEstimate) {
+        enterThanksFromEstimate(null);
+        return;
+      }
+
+      // If seller hasn't enabled buyer tracking yet (unset OR explicitly false),
+      // ask buyer tracking question first.
+      if (currentEstimate.buyerTracking !== true) {
+        setStep('track_demand');
+        return;
+      }
+
+      // If buyer tracking is enabled but trigger price isn't set, ask for trigger price.
+      if (currentEstimate.triggerPrice == null) {
+        setStep('price_entry');
+        return;
+      }
+
+      // Otherwise: everything required is answered, show thanks first.
+      enterThanksFromEstimate(currentEstimate);
+    },
+    [clearScheduleCallTimer, enterThanksFromEstimate]
+  );
+
+  useEffect(() => {
+    return () => clearScheduleCallTimer();
+  }, [clearScheduleCallTimer]);
+
   const showFeedback = step === 'feedback';
   const showTrackDemand = step === 'track_demand';
   const showPriceEntry = step === 'price_entry';
+  const showThanks = step === 'thanks';
   const showScheduleCall = step === 'schedule_call';
   const showScheduleCallConfirmedState =
     step === 'schedule_call_confirmed' || showScheduleCallConfirmed;
@@ -77,43 +141,61 @@ export function useSellerChatbot({
     if (!estimate?.propertyId) return;
     const level = estimate?.engagementLevel ?? 0;
     const threshold = onlyShowIfEngagementLevelAbove ?? -1;
+
     if (threshold >= 0 && level < threshold) {
       prevEngagementLevelRef.current = level;
       return;
     }
-    if (threshold >= 0 && (prevEngagementLevelRef.current ?? 0) < threshold && level >= threshold) {
+
+    if (
+      threshold >= 0 &&
+      (prevEngagementLevelRef.current ?? 0) < threshold &&
+      level >= threshold
+    ) {
       feedbackShownRef.current = false;
     }
+
     prevEngagementLevelRef.current = level;
+
     if (feedbackShownRef.current) return;
-    const timer = setTimeout(() => {
+
+    const timer = window.setTimeout(() => {
       setStep('feedback');
     }, FEEDBACK_POPUP_DELAY_MS);
+
     return () => clearTimeout(timer);
   }, [estimate?.propertyId, estimate?.engagementLevel, onlyShowIfEngagementLevelAbove]);
 
   const closeModal = useCallback(() => {
+    clearScheduleCallTimer();
+    pendingScheduleCallRef.current = false;
     setStep(null);
     setShowScheduleCallConfirmed(false);
-  }, []);
+  }, [clearScheduleCallTimer]);
 
-  const tryShowScheduleCall = useCallback(() => {
-    const showByInterest = hasHighBuyerInterest;
-    const showByThreshold = meetsScheduleCallThreshold(estimate?.engagementLevel);
-    if (showByInterest || showByThreshold) {
-      setStep('schedule_call');
-    } else {
-      setStep(null);
+  const closeThanks = useCallback(() => {
+    clearScheduleCallTimer();
+    const shouldSchedule = pendingScheduleCallRef.current;
+    pendingScheduleCallRef.current = false;
+    setStep(null);
+
+    if (shouldSchedule) {
+      scheduleCallTimerRef.current = window.setTimeout(() => {
+        setStep('schedule_call');
+      }, 2000);
     }
-  }, [hasHighBuyerInterest, estimate?.engagementLevel]);
+  }, [clearScheduleCallTimer]);
 
   const onFeedbackSelect = useCallback(
     (feedback: EstimateFeedback) => {
+      clearScheduleCallTimer();
+      feedbackShownRef.current = true;
+
       if (!token) {
-        feedbackShownRef.current = true;
-        setStep('track_demand');
+        advanceAfterAllAnswers(estimate);
         return;
       }
+
       propertyEstimateService
         .updateEngagement(
           propertyId,
@@ -121,28 +203,40 @@ export function useSellerChatbot({
           token
         )
         .then((updated) => {
-          feedbackShownRef.current = true;
           onEngagementUpdated?.(updated);
-          if (meetsScheduleCallThreshold(updated?.engagementLevel)) {
-            setStep('schedule_call');
-          } else {
-            setStep('track_demand');
-          }
+          advanceAfterAllAnswers(updated);
         })
         .catch(() => {
-          setStep('track_demand');
+          advanceAfterAllAnswers(estimate);
         });
     },
-    [propertyId, token, onEngagementUpdated]
+    [
+      token,
+      propertyId,
+      estimate,
+      onEngagementUpdated,
+      clearScheduleCallTimer,
+      advanceAfterAllAnswers,
+    ]
   );
 
   const onTrackDemandSelect = useCallback(
     (yes: boolean) => {
+      clearScheduleCallTimer();
+
       if (!token) {
-        if (yes) setStep('price_entry');
-        else tryShowScheduleCall();
+        if (yes) {
+          if (estimate?.triggerPrice == null) {
+            setStep('price_entry');
+          } else {
+            enterThanksFromEstimate(estimate);
+          }
+        } else {
+          enterThanksFromEstimate(estimate);
+        }
         return;
       }
+
       if (yes) {
         propertyEstimateService
           .updateEngagement(
@@ -152,58 +246,87 @@ export function useSellerChatbot({
           )
           .then((updated) => {
             onEngagementUpdated?.(updated);
-            if (meetsScheduleCallThreshold(updated?.engagementLevel)) {
-              setStep('schedule_call');
-            } else {
-              setStep('price_entry');
-            }
+            advanceAfterAllAnswers(updated);
           })
-          .catch(() => setStep('price_entry'));
+          .catch(() => {
+            if (estimate?.triggerPrice == null) setStep('price_entry');
+            else enterThanksFromEstimate(estimate);
+          });
       } else {
-        tryShowScheduleCall();
+        propertyEstimateService
+          .updateEngagement(
+            propertyId,
+            { buyerTracking: false },
+            token
+          )
+          .then((updated) => {
+            onEngagementUpdated?.(updated);
+            // If seller explicitly answers "No" for tracking, don't re-ask this question.
+            enterThanksFromEstimate(updated);
+          })
+          .catch(() => {
+            enterThanksFromEstimate(estimate);
+          });
       }
     },
-    [propertyId, token, tryShowScheduleCall, onEngagementUpdated]
+    [
+      token,
+      propertyId,
+      estimate,
+      onEngagementUpdated,
+      clearScheduleCallTimer,
+      advanceAfterAllAnswers,
+      enterThanksFromEstimate,
+    ]
   );
 
   const onPriceSubmit = useCallback(
     (price: number) => {
+      clearScheduleCallTimer();
+
       if (!token) {
-        tryShowScheduleCall();
+        enterThanksFromEstimate(estimate);
         return;
       }
+
       propertyEstimateService
         .updateEngagement(
           propertyId,
-          {
-            triggerPrice: price,
-            engagementDelta: ENGAGEMENT_DELTA_TRIGGER_PRICE,
-          },
+          { triggerPrice: price, engagementDelta: ENGAGEMENT_DELTA_TRIGGER_PRICE },
           token
         )
         .then((updated) => {
           onEngagementUpdated?.(updated);
-          if (meetsScheduleCallThreshold(updated?.engagementLevel)) {
-            setStep('schedule_call');
-          } else {
-            tryShowScheduleCall();
-          }
+          advanceAfterAllAnswers(updated);
         })
-        .catch(() => tryShowScheduleCall());
+        .catch(() => {
+          enterThanksFromEstimate(estimate);
+        });
     },
-    [propertyId, token, tryShowScheduleCall, onEngagementUpdated]
+    [
+      token,
+      propertyId,
+      estimate,
+      onEngagementUpdated,
+      clearScheduleCallTimer,
+      advanceAfterAllAnswers,
+      enterThanksFromEstimate,
+    ]
   );
 
   const onPriceSkip = useCallback(() => {
-    tryShowScheduleCall();
-  }, [tryShowScheduleCall]);
+    clearScheduleCallTimer();
+    enterThanksFromEstimate(estimate);
+  }, [clearScheduleCallTimer, enterThanksFromEstimate, estimate]);
 
   const onScheduleCallSelect = useCallback((schedule: boolean) => {
+    clearScheduleCallTimer();
+    pendingScheduleCallRef.current = false;
     setStep(null);
     if (schedule) {
       setShowScheduleCallConfirmed(true);
     }
-  }, []);
+  }, [clearScheduleCallTimer]);
 
   const closeScheduleCallConfirmed = useCallback(() => {
     setShowScheduleCallConfirmed(false);
@@ -214,6 +337,7 @@ export function useSellerChatbot({
     showFeedback,
     showTrackDemand,
     showPriceEntry,
+    showThanks,
     showScheduleCall,
     showScheduleCallConfirmed: showScheduleCallConfirmedState,
     onFeedbackSelect,
@@ -223,5 +347,7 @@ export function useSellerChatbot({
     onScheduleCallSelect,
     closeScheduleCallConfirmed,
     closeModal,
+    closeThanks,
   };
 }
+

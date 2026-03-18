@@ -246,6 +246,14 @@ export default function MyEstimatesPage() {
   const currentList = activeTab === 'estimates' ? estimates : favourites;
   const isLoading = activeTab === 'estimates' ? fetching : fetchingFavourites;
 
+  const priceEntryTitle =
+    selectedEstimate?.estimatedPrice != null
+      ? (() => {
+          const { min, max } = getPriceRangeIn5000(selectedEstimate.estimatedPrice);
+          return `The estimated market value is between ${formatPrice(min)} and ${formatPrice(max)}. At what price would you seriously consider selling?`;
+        })()
+      : 'At what price would you seriously consider selling?';
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -464,7 +472,7 @@ export default function MyEstimatesPage() {
       <Modal
         open={sellerChatbot.showTrackDemand}
         onClose={sellerChatbot.closeModal}
-        title="Would you like to track buyer demand anonymously?"
+        title="Track buyer demand in your area without publicly listing your property?"
         dismissLabel="Close"
       >
         <div className={styles.chatbotOptions}>
@@ -487,13 +495,24 @@ export default function MyEstimatesPage() {
       <Modal
         open={sellerChatbot.showPriceEntry}
         onClose={sellerChatbot.closeModal}
-        title="At what price would you seriously consider selling?"
+        title={priceEntryTitle}
         dismissLabel="Close"
       >
         <SellerPriceEntryForm
           onSubmit={sellerChatbot.onPriceSubmit}
           onSkip={sellerChatbot.onPriceSkip}
         />
+      </Modal>
+      <Modal
+        open={sellerChatbot.showThanks}
+        onClose={sellerChatbot.closeThanks}
+        title="Thanks for your feedback"
+        dismissLabel="Close"
+      >
+        <p className={styles.chatbotMessage}>Your interest has been recorded.</p>
+        <p className={styles.chatbotMessage}>
+          We will notify you if this property evolves or if a similar opportunity appears.
+        </p>
       </Modal>
       <Modal
         open={sellerChatbot.showScheduleCall}

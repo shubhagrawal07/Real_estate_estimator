@@ -26,6 +26,8 @@ export interface UseBuyerChatbotReturn {
   /** Close financial popup. When shouldReset is true (e.g. user clicked cross), resets engagement to 0. */
   closeFinancialStatus: (shouldReset?: boolean) => void;
   onFinancialStatusSelect: (status: FinancingStatus) => void;
+  showThanks: boolean;
+  closeThanks: () => void;
   showScheduleCall: boolean;
   onScheduleCallSelect: (schedule: boolean) => void;
   showScheduleCallConfirmed: boolean;
@@ -42,6 +44,8 @@ export function useBuyerChatbot({
   const [financialStatusPropertyId, setFinancialStatusPropertyId] = useState<string | null>(null);
   const [showScheduleCall, setShowScheduleCall] = useState(false);
   const [showScheduleCallConfirmed, setShowScheduleCallConfirmed] = useState(false);
+  const [showThanks, setShowThanks] = useState(false);
+  const showScheduleCallTimerRef = useRef<number | null>(null);
   /** Increments each time we open the financial modal so the Modal remounts and shows reliably. */
   const [financialModalKey, setFinancialModalKey] = useState(0);
   /** Prevents late resetEngagement .finally() from closing the modal after user reopened it. */
@@ -64,6 +68,27 @@ export function useBuyerChatbot({
     setFinancialModalKey((k) => k + 1);
     setFinancialStatusPropertyId(propertyId);
     setShowFinancialStatus(true);
+  }, []);
+
+  const closeThanks = useCallback(() => {
+    setShowThanks(false);
+    if (showScheduleCallTimerRef.current != null) {
+      window.clearTimeout(showScheduleCallTimerRef.current);
+      showScheduleCallTimerRef.current = null;
+    }
+    showScheduleCallTimerRef.current = window.setTimeout(() => {
+      setShowScheduleCall(true);
+      showScheduleCallTimerRef.current = null;
+    }, 2000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (showScheduleCallTimerRef.current != null) {
+        window.clearTimeout(showScheduleCallTimerRef.current);
+        showScheduleCallTimerRef.current = null;
+      }
+    };
   }, []);
 
   const closeFinancialStatus = useCallback(
@@ -102,7 +127,7 @@ export function useBuyerChatbot({
           .then(() => buyerEngagementService.resetEngagement(propertyId, token))
           .then(() => {
             closeFinancialStatus(false);
-            setShowScheduleCall(true);
+            setShowThanks(true);
           })
           .catch(() => closeFinancialStatus(false));
         return;
@@ -161,6 +186,8 @@ export function useBuyerChatbot({
     openFinancialStatus,
     closeFinancialStatus,
     onFinancialStatusSelect,
+    showThanks,
+    closeThanks,
     showScheduleCall,
     onScheduleCallSelect,
     showScheduleCallConfirmed,

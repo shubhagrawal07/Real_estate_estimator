@@ -734,6 +734,18 @@ export default function BuyerSearchResultsPage() {
       </Modal>
 
       <Modal
+        open={chatbot.showThanks}
+        onClose={chatbot.closeThanks}
+        title="Thanks for your feedback"
+        dismissLabel="Close"
+      >
+        <p className={styles.chatbotMessage}>Your interest has been recorded.</p>
+        <p className={styles.chatbotMessage}>
+          We will notify you if this property evolves or if a similar opportunity appears.
+        </p>
+      </Modal>
+
+      <Modal
         open={chatbot.showScheduleCallConfirmed}
         onClose={chatbot.closeScheduleCallConfirmed}
         title="Agent will contact you soon…"
