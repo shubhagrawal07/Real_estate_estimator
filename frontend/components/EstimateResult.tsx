@@ -7,9 +7,9 @@ interface EstimateResultProps {
   estimate: {
     propertyId?: string;
     address: string;
-    postalCode: number;
-    department: string;
-    municipality: string;
+    postalCode?: number;
+    department?: string;
+    municipality?: string;
     cadastralSection?: string;
     estimatedPrice?: number;
     basePricePerSqM?: number;
@@ -24,6 +24,7 @@ interface EstimateResultProps {
     deadline?: string;
     condition?: string;
     createdDate?: string;
+    [key: string]: unknown;
   };
 }
 
@@ -47,11 +48,11 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
   const hasKnownAddress =
     Boolean(estimate.address) &&
     estimate.address.toLowerCase() !== 'unknown' &&
-    estimate.postalCode > 0;
+    (estimate.postalCode == null || estimate.postalCode > 0);
 
   const hasKnownLocation =
     Boolean(estimate.municipality) &&
-    estimate.municipality.toLowerCase() !== 'unknown';
+    String(estimate.municipality).toLowerCase() !== 'unknown';
 
   return (
     <div className={styles.result}>
@@ -72,7 +73,8 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
           <div className={styles.detailItem}>
             <span className={styles.detailLabel}>Property Address:</span>
             <span className={styles.detailValue}>
-              {estimate.address}, {estimate.postalCode}
+              {estimate.address}
+              {estimate.postalCode != null && `, ${estimate.postalCode}`}
             </span>
           </div>
         )}
@@ -81,7 +83,7 @@ export default function EstimateResult({ estimate }: EstimateResultProps) {
           <div className={styles.detailItem}>
             <span className={styles.detailLabel}>Location:</span>
             <span className={styles.detailValue}>
-              {estimate.municipality}, {estimate.department}
+              {[estimate.municipality, estimate.department].filter(Boolean).join(', ')}
               {estimate.cadastralSection && ` (${estimate.cadastralSection})`}
             </span>
           </div>

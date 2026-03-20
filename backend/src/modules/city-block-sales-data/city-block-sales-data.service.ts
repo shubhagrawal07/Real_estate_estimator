@@ -6,6 +6,7 @@
 import { FetchDataParams, SalesDataRecord } from './types';
 import { fetchAndProcessData } from './api.service';
 import { CityBlockSalesDataRepo } from './city-block-sales-data.repo';
+import { logger } from '../../utils/logger';
 
 // ============================================================================
 // Utility Functions
@@ -49,44 +50,42 @@ async function saveToDatabase(
 ): Promise<number> {
   const repo = new CityBlockSalesDataRepo();
 
+  const serviceLog = logger.child({ module: 'city-block-service' });
   if (records.length === 0) {
-    console.log('[DB] No records to save');
+    serviceLog.info('No records to save');
     return 0;
   }
 
-  // Get maximum date for this code_insee
   const maxDate = await repo.getMaxDateByCodeInsee(codeInsee);
   let recordsToSave: SalesDataRecord[];
 
   if (maxDate === null) {
-    // No existing data - save all records
-    console.log(`[DB] No existing data for code_insee ${codeInsee}. Saving all ${records.length} records.`);
+    serviceLog.info('No existing data for code_insee; saving all records', {
+      code_insee: codeInsee,
+      count: records.length,
+    });
     recordsToSave = records;
   } else {
-    // Filter: only save records with date > maxDate
     recordsToSave = records.filter((record) => {
       const recordDateStr = extractDateString(record.date);
       return recordDateStr > maxDate;
     });
-    
-    console.log(`[DB] Date filtering for code_insee ${codeInsee}:`, {
+    serviceLog.info('Date filtering applied', {
+      code_insee: codeInsee,
       max_date: maxDate,
       total_records: records.length,
       filtered_records: recordsToSave.length,
-      skipped: records.length - recordsToSave.length,
     });
   }
 
-  // Save filtered records
   if (recordsToSave.length > 0) {
-    console.log(`[DB] Saving ${recordsToSave.length} records...`);
+    serviceLog.info('Saving records', { count: recordsToSave.length });
     await repo.insertMany(recordsToSave);
-    console.log('[DB] ✅ Records saved successfully');
+    serviceLog.info('Records saved successfully');
     return recordsToSave.length;
-  } else {
-    console.log('[DB] No new records to save (all dates <= max date)');
-    return 0;
   }
+  serviceLog.info('No new records to save (all dates <= max date)');
+  return 0;
 }
 
 // ============================================================================
@@ -114,34 +113,31 @@ export async function processRealEstateData(
 ): Promise<ProcessRealEstateDataResult> {
   const { anneemut_min, anneemut_max, code_insee } = params;
 
-  console.log('[Service] Starting real estate data processing', {
+  const serviceLog = logger.child({ module: 'city-block-service' });
+  serviceLog.info('Starting real estate data processing', {
     code_insee,
     year_range: `${anneemut_min}-${anneemut_max}`,
   });
 
   try {
-    // Step 1: Fetch and process data from API
     const records = await fetchAndProcessData({
       anneemut_min,
       anneemut_max,
       code_insee,
     });
-
     const totalRecords = records.length;
-    console.log('[Service] Data processing completed', {
-      total_records: totalRecords,
-    });
+    serviceLog.info('Data processing completed', { total_records: totalRecords });
 
-    // Step 2: Save to database with date validation
     const savedRecords = await saveToDatabase(records, code_insee);
-
-    console.log('[Service] ✅ Processing completed successfully', {
+    serviceLog.info('Processing completed successfully', {
       totalRecords,
       savedRecords,
     });
     return { totalRecords, savedRecords };
   } catch (error) {
-    console.error('[Service] ❌ Error processing real estate data:', error);
+    serviceLog.error('Error processing real estate data', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

@@ -1,6 +1,6 @@
-import { Repository, In } from 'typeorm';
+import { Repository, In, QueryRunner } from 'typeorm';
 import { AppDataSource } from '../../config/db';
-import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge } from './property-estimate.model';
+import { PropertyEstimate, PropertyStatus, PropertyType, BuildingAge, Feedback } from './property-estimate.model';
 import { ApartmentDetails, OutdoorSpace } from './entities/apartment-details.model';
 import { HouseDetails, PoolOption, ExteriorLayoutQuality } from './entities/house-details.model';
 import { CreatePropertyEstimateDto } from './property-estimate.service';
@@ -194,7 +194,12 @@ export class PropertyEstimateRepo {
     return this.repository.save(estimate);
   }
 
-  async updatePrice(propertyId: string, basePricePerSqM: number, estimatedPrice: number): Promise<PropertyEstimate | null> {
+  async updatePrice(
+    propertyId: string,
+    basePricePerSqM: number,
+    estimatedPrice: number,
+    engagementIncrement?: number
+  ): Promise<PropertyEstimate | null> {
     const estimate = await this.findOne(propertyId);
     if (!estimate) {
       return null;
@@ -202,11 +207,68 @@ export class PropertyEstimateRepo {
 
     estimate.basePricePerSqM = basePricePerSqM;
     estimate.estimatedPrice = estimatedPrice;
+    if (engagementIncrement !== undefined) {
+      estimate.engagementLevel = (estimate.engagementLevel ?? 1) + engagementIncrement;
+    }
     return this.repository.save(estimate);
   }
 
   async delete(propertyId: string): Promise<boolean> {
     const result = await this.repository.delete({ propertyId });
     return (result.affected ?? 0) > 0;
+  }
+
+  async incrementImpressions(
+    propertyId: string,
+    delta: number,
+    queryRunner?: QueryRunner
+  ): Promise<void> {
+    const qr = queryRunner ?? AppDataSource.createQueryRunner();
+    if (!queryRunner) await qr.connect();
+    try {
+      await qr.query(
+        `UPDATE property_estimates
+         SET impressions = GREATEST(0, COALESCE(impressions, 0) + $1)
+         WHERE "propertyId" = $2`,
+        [delta, propertyId]
+      );
+    } finally {
+      if (!queryRunner) await qr.release();
+    }
+  }
+
+  async updateEngagement(
+    propertyId: string,
+    data: {
+      feedback?: string;
+      buyerTracking?: boolean;
+      triggerPrice?: number;
+      engagementDelta?: number;
+    },
+    userId?: string
+  ): Promise<PropertyEstimate | null> {
+    const estimate = await this.findOne(propertyId);
+    if (!estimate) return null;
+    if (userId != null && estimate.userId !== userId) return null;
+
+    if (data.feedback !== undefined) {
+      const feedbackMap: Record<string, Feedback> = {
+        accurate: Feedback.ACCURATE,
+        high: Feedback.HIGH,
+        low: Feedback.LOW,
+        inaccurate: Feedback.INACCURATE,
+      };
+      estimate.feedback = feedbackMap[data.feedback] ?? (data.feedback as Feedback);
+    }
+    if (data.buyerTracking !== undefined) {
+      estimate.buyerTracking = data.buyerTracking;
+    }
+    if (data.triggerPrice !== undefined) {
+      estimate.triggerPrice = data.triggerPrice;
+    }
+    if (data.engagementDelta !== undefined && data.engagementDelta > 0) {
+      estimate.engagementLevel = (estimate.engagementLevel ?? 1) + data.engagementDelta;
+    }
+    return this.repository.save(estimate);
   }
 }

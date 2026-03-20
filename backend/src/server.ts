@@ -1,45 +1,44 @@
 import { createApp } from './app';
 import { initializeDatabase } from './config/db';
-import { config } from './config/env';
+import { config, validateEnv } from './config/env';
+import { logger } from './utils/logger';
 
 async function startServer(): Promise<void> {
   try {
-    // Initialize database
-    await initializeDatabase();
+    validateEnv();
   } catch (error) {
-    console.error('\n❌ Database Connection Failed!');
-    console.error('Please make sure PostgreSQL is running and configured correctly.');
-    console.error('\nTo start PostgreSQL:');
-    console.error('  Option 1: docker-compose up -d');
-    console.error('  Option 2: brew services start postgresql@15 (macOS)');
-    console.error('\nCheck your .env file for database credentials.');
-    console.error(`\nAttempted connection to: ${config.db.host}:${config.db.port}`);
-    console.error(`Database: ${config.db.database}`);
-    console.error(`Username: ${config.db.username}`);
-    console.error('\nServer will not start without database connection.\n');
+    logger.error('Environment validation failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     process.exit(1);
   }
 
   try {
-    // Create Express app
-    const app = createApp();
+    await initializeDatabase();
+  } catch (error) {
+    logger.error('Database connection failed', {
+      message: error instanceof Error ? error.message : String(error),
+      host: config.db.host,
+      port: config.db.port,
+      database: config.db.database,
+      username: config.db.username,
+    });
+    logger.info('Ensure PostgreSQL is running (e.g. docker-compose up -d or brew services start postgresql@15)');
+    process.exit(1);
+  }
 
-    // Start server
+  try {
+    const app = createApp();
     app.listen(config.port, () => {
-      console.log(`\n✅ Server is running on http://localhost:${config.port}`);
-      console.log(`✅ Database connected: ${config.db.database}\n`);
+      logger.info('Server started', { port: config.port, database: config.db.database });
     });
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'EADDRINUSE') {
-      console.error('\n❌ Port 3001 is already in use!');
-      console.error('Another server is running on this port.');
-      console.error('\nTo fix this:');
-      console.error('  1. Stop the other server process');
-      console.error('  2. Or change PORT in .env file to use a different port');
-      console.error('\nTo find and kill the process:');
-      console.error('  lsof -ti:3001 | xargs kill -9\n');
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+      logger.error('Port already in use', { port: config.port });
     } else {
-      console.error('Failed to start server:', error);
+      logger.error('Failed to start server', {
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
     process.exit(1);
   }

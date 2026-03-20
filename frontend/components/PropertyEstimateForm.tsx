@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useGeocoding, type AddressSuggestion } from '@/hooks/useGeocoding';
+import { ProgressStepHeader } from './estimate-form/ProgressStepHeader';
 import styles from './PropertyEstimateForm.module.css';
 
 export enum PropertyType {
@@ -25,7 +26,7 @@ type OutdoorSpace = 'none' | 'lt10' | 'gte10';
 type PoolOption = 'pool' | 'possible' | 'not_possible';
 type ConditionValue = 'excellent' | 'good' | 'needs renovation';
 
-interface PropertyData {
+export interface PropertyData {
   // Required fields
   address: string;
   locationCode: string; // Format: {code_insee}{padding}{cadastral_section} e.g., "83137000BY"
@@ -86,10 +87,10 @@ interface PropertyEstimateFormProps {
   loading: boolean;
 }
 
-const MIN_AREA = 20;
-const MAX_AREA = 300;
-const MIN_LAND_SIZE = 50;
-const MAX_LAND_SIZE = 1200;
+const MIN_AREA = 0;
+const MAX_AREA = 500;
+const MIN_LAND_SIZE = 0;
+const MAX_LAND_SIZE = 5000;
 
 export default function PropertyEstimateForm({
   onSubmit,
@@ -298,7 +299,7 @@ export default function PropertyEstimateForm({
       );
     }
     if (step === 2) {
-      if (formData.area < MIN_AREA || formData.bedrooms < 0) {
+      if (formData.area < 0 || formData.bedrooms < 0) {
         return false;
       }
       if (isApartment) {
@@ -311,7 +312,7 @@ export default function PropertyEstimateForm({
       const landSize = formData.landSize;
       return (
         landSize !== null &&
-        landSize >= MIN_LAND_SIZE &&
+        landSize >= 0 &&
         formData.sharedWalls !== null &&
         Boolean(formData.poolOption)
       );
@@ -327,9 +328,6 @@ export default function PropertyEstimateForm({
       console.log('Form submission blocked - not on step 3 or validation failed');
       return;
     }
-    
-    console.log('Submitting form...');
-
     const hasParking =
       formData.parkingGarage ||
       formData.parkingPrivate ||
@@ -499,7 +497,7 @@ export default function PropertyEstimateForm({
   );
 
   const renderStep2 = () => {
-    const landSize = formData.landSize ?? MIN_LAND_SIZE;
+    const landSize = formData.landSize ?? 0;
     
     return (
     <div className={styles.stepContent}>
@@ -512,7 +510,7 @@ export default function PropertyEstimateForm({
           <button
             type="button"
             className={styles.iconButton}
-            onClick={() => setField('area', Math.max(MIN_AREA, formData.area - 1))}
+            onClick={() => setField('area', Math.max(0, formData.area - 1))}
           >
             -
           </button>
@@ -531,8 +529,30 @@ export default function PropertyEstimateForm({
           >
             +
           </button>
+          <input
+            type="number"
+            min={MIN_AREA}
+            max={MAX_AREA}
+            value={formData.area}
+            onFocus={(event) => {
+              event.target.select();
+            }}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (!isNaN(value) && value >= 0 && value <= MAX_AREA) {
+                setField('area', Math.max(0, Math.round(value)));
+              }
+            }}
+            onBlur={(event) => {
+              const value = Number(event.target.value);
+              if (!isNaN(value) && value >= 0 && value <= MAX_AREA) {
+                setField('area', Math.max(0, Math.round(value)));
+              }
+            }}
+            className={styles.sliderInput}
+          />
+          <span className={styles.unitLabel}>m²</span>
         </div>
-        <div className={styles.valueBadge}>{formData.area} m²</div>
       </div>
 
       <div className={styles.section}>
@@ -679,7 +699,7 @@ export default function PropertyEstimateForm({
               <button
                 type="button"
                 className={styles.iconButton}
-                onClick={() => setField('landSize', Math.max(MIN_LAND_SIZE, landSize - 10))}
+                onClick={() => setField('landSize', Math.max(0, landSize - 10))}
               >
                 -
               </button>
@@ -698,8 +718,30 @@ export default function PropertyEstimateForm({
               >
                 +
               </button>
+              <input
+                type="number"
+                min={MIN_LAND_SIZE}
+                max={MAX_LAND_SIZE}
+                value={landSize}
+                onFocus={(event) => {
+                  event.target.select();
+                }}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (!isNaN(value) && value >= 0 && value <= MAX_LAND_SIZE) {
+                    setField('landSize', Math.max(0, Math.round(value)));
+                  }
+                }}
+                onBlur={(event) => {
+                  const value = Number(event.target.value);
+                  if (!isNaN(value) && value >= 0 && value <= MAX_LAND_SIZE) {
+                    setField('landSize', Math.max(0, Math.round(value)));
+                  }
+                }}
+                className={styles.sliderInput}
+              />
+              <span className={styles.unitLabel}>m²</span>
             </div>
-            <div className={styles.valueBadge}>{landSize} m²</div>
           </div>
 
           <div className={styles.section}>
@@ -944,14 +986,12 @@ export default function PropertyEstimateForm({
 
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
-      <div className={styles.progressHeader}>
-        <span>Step {currentStep} / 3</span>
-        <span>{stepLabels[currentStep - 1]}</span>
-      </div>
-      <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
-      </div>
-
+      <ProgressStepHeader
+        currentStep={currentStep}
+        totalSteps={3}
+        stepLabels={stepLabels}
+        progressPercent={progressPercent}
+      />
       <div key={currentStep} className={styles.stepContainer}>
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}

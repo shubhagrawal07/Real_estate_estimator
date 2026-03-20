@@ -32,6 +32,13 @@ export enum PropertyStatus {
   SOLD = 'sold',
 }
 
+export enum Feedback {
+  ACCURATE = 'accurate',
+  HIGH = 'high',
+  LOW = 'low',
+  INACCURATE = 'inaccurate',
+}
+
 @Entity('property_estimates')
 export class PropertyEstimate {
   @PrimaryGeneratedColumn('uuid')
@@ -143,4 +150,21 @@ export class PropertyEstimate {
     enum: PropertyStatus,
   })
   status!: PropertyStatus;
+
+  @Column({ name: 'trigger_price', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  triggerPrice?: number;
+
+  @Column({ name: 'engagement_level', type: 'int', default: 1 })
+  engagementLevel!: number;
+
+  @Column({ name: 'buyer_tracking', type: 'boolean', default: false })
+  buyerTracking!: boolean;
+
+  @Column({
+    name: 'feedback',
+    type: 'enum',
+    enum: Feedback,
+    nullable: true,
+  })
+  feedback?: Feedback;
 }

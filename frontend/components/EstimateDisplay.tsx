@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import styles from './EstimateDisplay.module.css';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 
@@ -32,7 +33,7 @@ interface EstimateDisplayProps {
   loading: boolean;
 }
 
-export default function EstimateDisplay({ estimate, onRecalculate, loading }: EstimateDisplayProps) {
+function EstimateDisplay({ estimate, onRecalculate, loading }: EstimateDisplayProps) {
   const formatPrice = (price?: number) => {
     if (!price) return 'N/A';
     return new Intl.NumberFormat('en-US', {
@@ -80,16 +81,6 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Address</span>
               <span className={styles.summaryValue}>{estimate.address}</span>
-            </div>
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Postal Code</span>
-              <span className={styles.summaryValue}>{estimate.postalCode}</span>
-            </div>
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Location</span>
-              <span className={styles.summaryValue}>
-                {estimate.municipality}, {estimate.department}
-              </span>
             </div>
             <div className={styles.summaryItem}>
               <span className={styles.summaryLabel}>Property Type</span>
@@ -164,3 +155,4 @@ export default function EstimateDisplay({ estimate, onRecalculate, loading }: Es
   );
 }
 
+export default React.memo(EstimateDisplay);

@@ -1,16 +1,17 @@
+/* Mobile-first: default = mobile */
 .container {
-  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1.25rem 1rem;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .title {
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
@@ -20,7 +21,7 @@
 }
 
 .subtitle {
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: #666;
   font-weight: 400;
 }
@@ -34,25 +35,28 @@
 .formSection {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .resultSection {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   animation: slideIn 0.5s ease-out;
 }
 
 .resultHeader {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
 }
 
 .newEstimateButton {
+  min-height: 2.75rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
@@ -89,21 +93,96 @@
   text-align: center;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
   .container {
-    padding: 1rem;
+    max-width: 1200px;
+    padding: 2rem;
+  }
+
+  .header {
+    margin-bottom: 3rem;
   }
 
   .title {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
   .subtitle {
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
 
   .formSection,
   .resultSection {
-    padding: 1.5rem;
+    padding: 2rem;
   }
+}
+
+/* Chatbot modals */
+.chatbotMessage {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #333;
+}
+
+.chatbotOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chatbotOptionButton {
+  min-height: 2.75rem;
+  padding: 0.75rem 1rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chatbotOptionButton:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.chatbotPrimaryButton {
+  min-height: 2.75rem;
+  padding: 0.75rem 1rem;
+  background: #667eea;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.chatbotPrimaryButton:hover {
+  background: #5568d3;
+}
+
+.priceEntryForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.priceEntryInput {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.priceEntryInput:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }

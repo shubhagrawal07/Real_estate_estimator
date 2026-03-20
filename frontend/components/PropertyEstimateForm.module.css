@@ -1,3 +1,4 @@
+/* Mobile-first: default = mobile */
 .form {
   width: 100%;
   background: white;
@@ -6,7 +7,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .progressHeader {
@@ -34,7 +35,7 @@
 
 .stepContainer {
   position: relative;
-  min-height: 400px;
+  min-height: 320px;
   overflow: hidden;
 }
 
@@ -57,7 +58,7 @@
 }
 
 .stepTitle {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #222;
   margin: 0;
@@ -72,8 +73,8 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding-bottom: 1rem;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
   border-bottom: 1px solid #eee;
 }
 
@@ -90,7 +91,7 @@
 
 .addressRow {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr;
   gap: 0.75rem;
   position: relative;
 }
@@ -99,6 +100,7 @@
 .postalInput {
   width: 100%;
   padding: 0.875rem 1rem;
+  min-height: 2.75rem;
   border: 2px solid #e0e0e0;
   border-radius: 12px;
   font-size: 1rem;
@@ -106,6 +108,7 @@
   background: #fafafa;
   transition: all 0.3s ease;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
 .addressInput:focus,
@@ -122,7 +125,6 @@
   font-size: 0.9rem;
 }
 
-/* Remove number input arrows */
 .postalInput::-webkit-outer-spin-button,
 .postalInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -163,6 +165,7 @@
 
 .suggestionItem {
   width: 100%;
+  min-height: 2.75rem;
   padding: 0.875rem 1rem;
   text-align: left;
   border: none;
@@ -196,6 +199,7 @@
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .suggestionPostcode {
@@ -205,12 +209,6 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 640px) {
-  .addressRow {
-    grid-template-columns: 1fr;
-  }
-}
-
 .optionGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -218,6 +216,7 @@
 }
 
 .optionButton {
+  min-height: 2.75rem;
   border: 1px solid #e0e0e0;
   background: #fafafa;
   border-radius: 12px;
@@ -258,6 +257,7 @@
 }
 
 .chipButton {
+  min-height: 2.75rem;
   border: 1px solid #e0e0e0;
   background: #f8f8fb;
   border-radius: 999px;
@@ -286,24 +286,81 @@
 
 .sliderRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
+/* Mobile: slider full width on first row for clear thumb and touch; controls wrap below */
 .slider {
-  flex: 1;
+  flex: 1 1 100%;
+  min-width: 0;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0;
   accent-color: #667eea;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e8e8ed;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+  cursor: pointer;
+  margin-top: -8px;
+  border: 2px solid white;
+}
+
+.slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e8e8ed;
+}
+
+.slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+  cursor: pointer;
+  border: 2px solid white;
 }
 
 .iconButton {
-  width: 36px;
-  height: 36px;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
   border-radius: 10px;
   border: 1px solid #e0e0e0;
   background: #fff;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sliderRow .iconButton {
+  flex-shrink: 0;
+}
+
+/* Hide + / - on mobile; show from tablet up */
+.sliderRow .iconButton {
+  display: none;
 }
 
 .valueBadge {
@@ -316,6 +373,45 @@
   color: #444;
 }
 
+.sliderInput {
+  width: 5rem;
+  min-width: 4.5rem;
+  padding: 0.625rem 0.75rem;
+  min-height: 2.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  color: #333;
+  background: #fff;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.sliderInput:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.sliderInput::-webkit-outer-spin-button,
+.sliderInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sliderInput[type=number] {
+  -moz-appearance: textfield;
+}
+
+.unitLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #666;
+  min-width: 30px;
+}
+
 .stepActions {
   display: flex;
   flex-direction: column;
@@ -326,6 +422,7 @@
 .previousButton,
 .nextButton,
 .submitButton {
+  min-height: 2.75rem;
   padding: 0.85rem 1.5rem;
   border: none;
   border-radius: 12px;
@@ -355,9 +452,44 @@
   box-shadow: none;
 }
 
+@media (min-width: 641px) {
+  .addressRow {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
 @media (min-width: 768px) {
   .form {
     padding: 2rem;
+  }
+
+  .form .section {
+    gap: 0.75rem;
+    padding-bottom: 1rem;
+  }
+
+  .stepContainer {
+    min-height: 400px;
+  }
+
+  .stepTitle {
+    font-size: 1.4rem;
+  }
+
+  /* Desktop: single row for slider + controls */
+  .sliderRow {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
+
+  .sliderRow .iconButton {
+    display: flex;
+  }
+
+  .slider {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 0;
   }
 
   .optionGrid {
