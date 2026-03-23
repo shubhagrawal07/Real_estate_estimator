@@ -54,6 +54,9 @@ export const initializeDatabase = async (): Promise<void> => {
           Zone,
           Subscription,
           CityBlockSalesData,
+          FavouriteProperty,
+          BuyerEngagement,
+          SellerAlert,
         ],
         synchronize: false, // Don't synchronize yet
       });
@@ -90,6 +93,9 @@ export const initializeDatabase = async (): Promise<void> => {
               Zone,
               Subscription,
               CityBlockSalesData,
+              FavouriteProperty,
+              BuyerEngagement,
+              SellerAlert,
             ],
             synchronize: true, // Enable synchronize to create tables
           });
