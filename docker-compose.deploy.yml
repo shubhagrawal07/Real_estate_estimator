@@ -71,6 +71,9 @@ services:
       NEXTAUTH_URL: ${FRONTEND_URL:-http://localhost:3000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Client map token is baked in at docker build; rebuild frontend image with
+      # NEXT_PUBLIC_MAPBOX_TOKEN if the map is missing after deploy.
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:

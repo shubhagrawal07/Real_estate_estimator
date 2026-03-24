@@ -15,6 +15,10 @@ COPY . .
 # Ensure public directory exists (Next.js may need it)
 RUN mkdir -p public || true
 
+# NEXT_PUBLIC_* is inlined at build time; must be set when building the image
+ARG NEXT_PUBLIC_MAPBOX_TOKEN
+ENV NEXT_PUBLIC_MAPBOX_TOKEN=$NEXT_PUBLIC_MAPBOX_TOKEN
+
 # Build Next.js application
 RUN npm run build
 
