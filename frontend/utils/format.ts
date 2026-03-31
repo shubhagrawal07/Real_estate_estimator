@@ -2,7 +2,7 @@
  * Reusable formatting helpers for the frontend.
  */
 
-export function formatPrice(price: number | undefined, currency = 'USD'): string {
+export function formatPrice(price: number | undefined, currency = 'EUR'): string {
   if (price == null || Number.isNaN(price)) return 'N/A';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

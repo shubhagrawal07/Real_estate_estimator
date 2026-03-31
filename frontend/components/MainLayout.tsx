@@ -70,7 +70,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const formatAlertMessage = (alert: SellerAlertItem): string => {
     if (alert.type === 'buyer_above_trigger') {
       const budget = alert.payload && typeof alert.payload.budget === 'number'
-        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(alert.payload.budget)
+        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(alert.payload.budget)
         : null;
       const budgetPart = budget ? `with budget ${budget} ` : '';
       const base = `A new buyer arrived ${budgetPart}that might be interested in your property`;

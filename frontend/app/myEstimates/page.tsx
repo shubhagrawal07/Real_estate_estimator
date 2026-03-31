@@ -228,7 +228,7 @@ export default function MyEstimatesPage() {
     if (!price) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EUR',
       maximumFractionDigits: 0,
     }).format(price);
   };
