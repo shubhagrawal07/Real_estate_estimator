@@ -192,11 +192,32 @@
   transform: scale(1.1);
 }
 
-.expandIcon {
-  font-size: 1.2rem;
+.detailsButton {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 2px solid #667eea;
+  background: transparent;
   color: #667eea;
-  transition: transform 0.2s;
-  padding: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+
+.detailsButton:hover {
+  background: rgba(102, 126, 234, 0.08);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.detailsButton:focus-visible {
+  outline: 2px solid #764ba2;
+  outline-offset: 2px;
+}
+
+.estimateItem.expanded .detailsButton {
+  background: rgba(102, 126, 234, 0.12);
 }
 
 .estimateDetailExpanded {

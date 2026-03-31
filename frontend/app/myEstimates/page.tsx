@@ -395,9 +395,24 @@ export default function MyEstimatesPage() {
                       </button>
                     )}
                     {activeTab === 'estimates' && (
-                      <div className={styles.expandIcon}>
-                        {selectedEstimate?.propertyId === estimate.propertyId ? '▼' : '▶'}
-                      </div>
+                      <button
+                        type="button"
+                        className={styles.detailsButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEstimateClick(estimate);
+                        }}
+                        aria-expanded={
+                          selectedEstimate?.propertyId === estimate.propertyId
+                        }
+                        aria-label={
+                          selectedEstimate?.propertyId === estimate.propertyId
+                            ? 'Hide property details'
+                            : 'Show property details'
+                        }
+                      >
+                        Details
+                      </button>
                     )}
                   </div>
                 </div>
