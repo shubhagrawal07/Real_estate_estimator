@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
 import Modal from '@/components/Modal';
 import PotentialBuyersModal from '@/components/PotentialBuyersModal';
+import { HoverTooltip } from '@/components/HoverTooltip';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyEstimates';
 import { useSellerChatbot } from '@/hooks/useSellerChatbot';
@@ -342,78 +343,92 @@ export default function MyEstimatesPage() {
                     </div>
                   </div>
                   <div className={styles.estimateActions}>
-                    <button
-                      className={styles.viewMapButton}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const source = activeTab === 'favourites' ? 'favourites' : 'estimates';
-                        router.push(`/myPropertiesMap?propertyId=${estimate.propertyId}&source=${source}`);
-                      }}
-                      title="View on map"
-                    >
-                      🗺️ View on Map
-                    </button>
-                    {activeTab === 'estimates' && Boolean((estimate as { buyerTracking?: boolean }).buyerTracking) && (
+                    <HoverTooltip label="View on map" block>
                       <button
                         className={styles.viewMapButton}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPotentialBuyersPropertyId(estimate.propertyId);
+                          const source = activeTab === 'favourites' ? 'favourites' : 'estimates';
+                          router.push(`/myPropertiesMap?propertyId=${estimate.propertyId}&source=${source}`);
                         }}
-                        title="View potential buyers"
+                        aria-label="View on map"
                       >
-                        Potential Buyers
+                        🗺️ View on Map
                       </button>
+                    </HoverTooltip>
+                    {activeTab === 'estimates' && Boolean((estimate as { buyerTracking?: boolean }).buyerTracking) && (
+                      <HoverTooltip label="View potential buyers" block>
+                        <button
+                          className={styles.viewMapButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPotentialBuyersPropertyId(estimate.propertyId);
+                          }}
+                          aria-label="View potential buyers"
+                        >
+                          Potential Buyers
+                        </button>
+                      </HoverTooltip>
                     )}
-                    {activeTab === 'estimates' && (
-                      <button
-                        className={styles.deleteButton}
-                        onClick={(e) => handleDeleteClick(e, estimate.propertyId)}
-                        title="Delete estimate"
-                      >
-                        🗑️
-                      </button>
-                    )}
-                    {activeTab === 'favourites' && token && (
-                      <button
-                        className={styles.deleteButton}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            await favouritePropertyService.remove(estimate.propertyId, token);
-                            setFavourites(favourites.filter((f) => f.propertyId !== estimate.propertyId));
-                            if (selectedEstimate?.propertyId === estimate.propertyId) {
-                              setSelectedEstimate(null);
+                    <div className={styles.estimateIconActions}>
+                      {activeTab === 'estimates' && (
+                        <HoverTooltip label="Delete this estimate">
+                          <button
+                            type="button"
+                            className={styles.deleteButton}
+                            onClick={(e) => handleDeleteClick(e, estimate.propertyId)}
+                            aria-label="Delete this estimate"
+                          >
+                            🗑️
+                          </button>
+                        </HoverTooltip>
+                      )}
+                      {activeTab === 'favourites' && token && (
+                        <HoverTooltip label="Remove from favourites">
+                          <button
+                            type="button"
+                            className={styles.deleteButton}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await favouritePropertyService.remove(estimate.propertyId, token);
+                                setFavourites(favourites.filter((f) => f.propertyId !== estimate.propertyId));
+                                if (selectedEstimate?.propertyId === estimate.propertyId) {
+                                  setSelectedEstimate(null);
+                                }
+                              } catch {
+                                // Silent fail
+                              }
+                            }}
+                            aria-label="Remove from favourites"
+                          >
+                            ❤️
+                          </button>
+                        </HoverTooltip>
+                      )}
+                      {activeTab === 'estimates' && (
+                        <HoverTooltip label="See property details">
+                          <button
+                            type="button"
+                            className={styles.detailsButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEstimateClick(estimate);
+                            }}
+                            aria-expanded={
+                              selectedEstimate?.propertyId === estimate.propertyId
                             }
-                          } catch {
-                            // Silent fail
-                          }
-                        }}
-                        title="Remove from favourites"
-                      >
-                        ❤️
-                      </button>
-                    )}
-                    {activeTab === 'estimates' && (
-                      <button
-                        type="button"
-                        className={styles.detailsButton}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEstimateClick(estimate);
-                        }}
-                        aria-expanded={
-                          selectedEstimate?.propertyId === estimate.propertyId
-                        }
-                        aria-label={
-                          selectedEstimate?.propertyId === estimate.propertyId
-                            ? 'Hide property details'
-                            : 'Show property details'
-                        }
-                      >
-                        Details
-                      </button>
-                    )}
+                            aria-label={
+                              selectedEstimate?.propertyId === estimate.propertyId
+                                ? 'Hide property details'
+                                : 'Show property details'
+                            }
+                          >
+                            Details
+                          </button>
+                        </HoverTooltip>
+                      )}
+                    </div>
                   </div>
                 </div>
 
