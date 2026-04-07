@@ -139,28 +139,46 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <div className={styles.layout}>
       {/* Header */}
       <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          {/* Burger menu for mobile */}
-          {isMobile && (
+        <div className={styles.headerRow}>
+          <div className={styles.headerLeft}>
+            {/* Burger menu for mobile */}
+            {isMobile && (
+              <button
+                className={styles.burgerButton}
+                onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+                aria-label="Toggle menu"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {mobileSidebarOpen ? (
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  ) : (
+                    <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  )}
+                </svg>
+              </button>
+            )}
+            <h1 className={styles.logo} onClick={() => router.push('/')}>
+              OffMarket
+            </h1>
+          </div>
+          <div className={styles.headerCtas}>
             <button
-              className={styles.burgerButton}
-              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-              aria-label="Toggle menu"
+              type="button"
+              className={styles.headerPrimaryCta}
+              onClick={() => router.push('/getEstimates')}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {mobileSidebarOpen ? (
-                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                ) : (
-                  <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                )}
-              </svg>
+              Estimate my property
             </button>
-          )}
-          <h1 className={styles.logo} onClick={() => router.push('/')}>
-            Real Estate Estimator
-          </h1>
-        </div>
-        <div className={styles.headerRight}>
+            <button
+              type="button"
+              className={styles.headerSecondaryCta}
+              onClick={() => router.push('/buyerSearch')}
+            >
+              I&apos;m looking to buy
+            </button>
+          </div>
+          <div className={styles.headerSpacer} aria-hidden />
+          <div className={styles.headerRight}>
           <button className={styles.helpButton}>Help</button>
           {session && (
             <div className={styles.notificationWrap} ref={alertsRef}>
@@ -238,6 +256,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               Login
             </button>
           )}
+          </div>
         </div>
       </header>
 

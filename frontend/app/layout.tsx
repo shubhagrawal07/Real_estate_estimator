@@ -4,8 +4,9 @@ import SessionProvider from '@/components/SessionProvider'
 import MainLayout from '@/components/MainLayout'
 
 export const metadata: Metadata = {
-  title: 'Real Estate Price Estimator',
-  description: 'Get an instant estimate of your property\'s market value',
+  title: 'OffMarket — Sell or buy before listings go public',
+  description:
+    'Connect with qualified buyers or access off-market properties. Estimates from real DVF data — discreet, serious, no public listing required.',
 }
 
 export default function RootLayout({
