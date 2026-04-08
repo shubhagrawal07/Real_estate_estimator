@@ -197,8 +197,7 @@ export class PropertyEstimateRepo {
   async updatePrice(
     propertyId: string,
     basePricePerSqM: number,
-    estimatedPrice: number,
-    engagementIncrement?: number
+    estimatedPrice: number
   ): Promise<PropertyEstimate | null> {
     const estimate = await this.findOne(propertyId);
     if (!estimate) {
@@ -207,9 +206,6 @@ export class PropertyEstimateRepo {
 
     estimate.basePricePerSqM = basePricePerSqM;
     estimate.estimatedPrice = estimatedPrice;
-    if (engagementIncrement !== undefined) {
-      estimate.engagementLevel = (estimate.engagementLevel ?? 1) + engagementIncrement;
-    }
     return this.repository.save(estimate);
   }
 
@@ -242,8 +238,6 @@ export class PropertyEstimateRepo {
     data: {
       feedback?: string;
       buyerTracking?: boolean;
-      triggerPrice?: number;
-      engagementDelta?: number;
     },
     userId?: string
   ): Promise<PropertyEstimate | null> {
@@ -262,12 +256,6 @@ export class PropertyEstimateRepo {
     }
     if (data.buyerTracking !== undefined) {
       estimate.buyerTracking = data.buyerTracking;
-    }
-    if (data.triggerPrice !== undefined) {
-      estimate.triggerPrice = data.triggerPrice;
-    }
-    if (data.engagementDelta !== undefined && data.engagementDelta > 0) {
-      estimate.engagementLevel = (estimate.engagementLevel ?? 1) + data.engagementDelta;
     }
     return this.repository.save(estimate);
   }

@@ -81,7 +81,7 @@ export class PropertyEstimateService {
       basePricePerSqM,
       estimatedPrice,
       impressions: 0,
-      engagementLevel: 1,
+      buyerTracking: true,
       status: userId ? PropertyStatus.NEW : PropertyStatus.DRAFT,
       userId: userId || undefined,
     });
@@ -173,8 +173,6 @@ export class PropertyEstimateService {
     data: {
       feedback?: 'accurate' | 'high' | 'low' | 'inaccurate';
       buyerTracking?: boolean;
-      triggerPrice?: number;
-      engagementDelta?: number;
     }
   ): Promise<PropertyEstimate | null> {
     return this.repo.updateEngagement(propertyId, data, userId);
@@ -186,8 +184,8 @@ export class PropertyEstimateService {
   }
 
   /**
-   * Returns anonymous potential buyers for a property. Only the property owner may call this,
-   * and only when buyerTracking is enabled.
+   * Returns anonymous buyer engagement rows for a property. Only the property owner may call this.
+   * (Visibility in the UI may later be gated by buyerTracking; the API allows the owner regardless.)
    */
   async getPotentialBuyers(
     propertyId: string,
@@ -199,9 +197,6 @@ export class PropertyEstimateService {
     }
     if (property.userId !== userId) {
       throw new AppError('You do not have permission to view potential buyers for this property', 403);
-    }
-    if (!property.buyerTracking) {
-      throw new AppError('Buyer tracking is not enabled for this property', 403);
     }
     return this.buyerEngagementRepo.findByPropertyIdAnonymous(propertyId);
   }

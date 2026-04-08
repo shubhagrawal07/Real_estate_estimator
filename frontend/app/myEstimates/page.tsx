@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
+import PotentialBuyersModal from '@/components/PotentialBuyersModal';
 import { HoverTooltip } from '@/components/HoverTooltip';
 import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyEstimates';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
@@ -60,6 +61,8 @@ export default function MyEstimatesPage() {
     show: false,
     propertyId: null,
   });
+  /** Modal open for this propertyId; later we may hide the entry point when buyerTracking is false. */
+  const [potentialBuyersPropertyId, setPotentialBuyersPropertyId] = useState<string | null>(null);
 
   const error = activeTab === 'estimates' ? errorEstimates : errorFavourites;
 
@@ -267,6 +270,21 @@ export default function MyEstimatesPage() {
                         🗺️ View on Map
                       </button>
                     </HoverTooltip>
+                    {activeTab === 'estimates' && (
+                      <HoverTooltip label="Buyers who clicked or showed interest (anonymous)" block>
+                        <button
+                          type="button"
+                          className={styles.potentialBuyersButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPotentialBuyersPropertyId(estimate.propertyId);
+                          }}
+                          aria-label="Potential buyers"
+                        >
+                          Potential buyers
+                        </button>
+                      </HoverTooltip>
+                    )}
                     <div className={styles.estimateIconActions}>
                       {activeTab === 'estimates' && (
                         <HoverTooltip label="Delete this estimate">
@@ -345,6 +363,13 @@ export default function MyEstimatesPage() {
           </div>
         )}
       </div>
+
+      <PotentialBuyersModal
+        open={potentialBuyersPropertyId !== null}
+        onClose={() => setPotentialBuyersPropertyId(null)}
+        propertyId={potentialBuyersPropertyId ?? ''}
+        token={token}
+      />
 
       {deleteConfirm.show && (
         <div className={styles.modalOverlay} onClick={handleDeleteCancel}>

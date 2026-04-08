@@ -151,13 +151,7 @@ export class PropertyEstimate {
   })
   status!: PropertyStatus;
 
-  @Column({ name: 'trigger_price', type: 'decimal', precision: 12, scale: 2, nullable: true })
-  triggerPrice?: number;
-
-  @Column({ name: 'engagement_level', type: 'int', default: 1 })
-  engagementLevel!: number;
-
-  @Column({ name: 'buyer_tracking', type: 'boolean', default: false })
+  @Column({ name: 'buyer_tracking', type: 'boolean', default: true })
   buyerTracking!: boolean;
 
   @Column({

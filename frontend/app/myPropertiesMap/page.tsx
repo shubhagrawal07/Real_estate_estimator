@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import PotentialBuyersModal from '@/components/PotentialBuyersModal';
 import { propertyEstimateService } from '@/services/property-estimate.service';
 import { favouritePropertyService } from '@/services/favourite-property.service';
 import type { PropertyEstimateResponse } from '@/types/estimate';
@@ -89,6 +90,7 @@ function MyPropertiesMapContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [potentialBuyersPropertyId, setPotentialBuyersPropertyId] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const propertiesRef = useRef<PropertyEstimate[]>([]);
   const initialUrlFocusDoneRef = useRef(false);
@@ -415,8 +417,11 @@ function MyPropertiesMapContent() {
     );
   }
 
+  const listSource = searchParams?.get('source') || 'estimates';
+  const showPotentialBuyersButton = listSource !== 'favourites';
+
   if (properties.length === 0) {
-    const source = searchParams?.get('source') || 'estimates';
+    const source = listSource;
     return (
       <div className={styles.container}>
         <div className={styles.headerWithBack}>
@@ -441,10 +446,10 @@ function MyPropertiesMapContent() {
       <div className={styles.header}>
         {backButton}
         <h1 className={styles.title}>
-          {searchParams?.get('source') === 'favourites' ? 'My Favourite Properties' : 'My Saved Properties'}
+          {listSource === 'favourites' ? 'My Favourite Properties' : 'My Saved Properties'}
         </h1>
         <p className={styles.subtitle}>
-          {searchParams?.get('source') === 'favourites' 
+          {listSource === 'favourites' 
             ? 'View all your favourite properties on an interactive map'
             : 'View all your properties on an interactive map'}
         </p>
@@ -478,6 +483,19 @@ function MyPropertiesMapContent() {
                     )}
                   </div>
                   <div className={styles.propertyPrice}>{formatPrice(property.estimatedPrice)}</div>
+                  {showPotentialBuyersButton && token && (
+                    <button
+                      type="button"
+                      className={styles.potentialBuyersButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPotentialBuyersPropertyId(property.propertyId);
+                      }}
+                      aria-label="Potential buyers"
+                    >
+                      Potential buyers
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -486,6 +504,13 @@ function MyPropertiesMapContent() {
 
         <div className={styles.mapContainer} ref={mapContainer} />
       </div>
+
+      <PotentialBuyersModal
+        open={potentialBuyersPropertyId !== null}
+        onClose={() => setPotentialBuyersPropertyId(null)}
+        propertyId={potentialBuyersPropertyId ?? ''}
+        token={token}
+      />
     </div>
   );
 }

@@ -35,4 +35,21 @@ export class UserIntentRepo {
     });
     return this.repository.save(row);
   }
+
+  /**
+   * Latest seller intent row for this property with a non-null target price (owner-only intents).
+   */
+  async findLatestWithTargetPriceForOwner(
+    propertyId: string,
+    ownerUserId: string
+  ): Promise<UserIntent | null> {
+    return this.repository
+      .createQueryBuilder('ui')
+      .where('ui.propertyId = :propertyId', { propertyId })
+      .andWhere('ui.userId = :ownerUserId', { ownerUserId })
+      .andWhere('ui.targetPrice IS NOT NULL')
+      .orderBy('ui.createdAt', 'DESC')
+      .limit(1)
+      .getOne();
+  }
 }

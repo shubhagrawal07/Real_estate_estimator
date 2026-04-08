@@ -1,6 +1,7 @@
 import { AppDataSource } from '../../config/db';
 import { BuyerEngagementRepo } from './buyer-engagement.repo';
 import { PropertyEstimateRepo } from '../property-estimate/property-estimate.repo';
+import { UserIntentRepo } from '../user-intent/user-intent.repo';
 import { SellerAlertService } from '../seller-alert/seller-alert.service';
 import { AppError } from '../../utils/AppError';
 
@@ -20,29 +21,37 @@ export interface EngagementRecord {
 export class BuyerEngagementService {
   private engagementRepo: BuyerEngagementRepo;
   private propertyRepo: PropertyEstimateRepo;
+  private userIntentRepo: UserIntentRepo;
   private sellerAlertService: SellerAlertService;
 
   constructor() {
     this.engagementRepo = new BuyerEngagementRepo();
     this.propertyRepo = new PropertyEstimateRepo();
+    this.userIntentRepo = new UserIntentRepo();
     this.sellerAlertService = new SellerAlertService();
   }
 
-  /** If property has buyerTracking and triggerPrice set and budget >= triggerPrice, create seller alert (at most one per property per day). */
-  private async maybeCreateTriggerPriceAlert(
+  /**
+   * When the seller has saved a target price on user intent and the buyer budget meets it,
+   * create the same seller alert as before (at most one per property per UTC day).
+   */
+  private async maybeCreateSellerBudgetAlert(
     propertyId: string,
     budget: number
   ): Promise<void> {
     const property = await this.propertyRepo.findOne(propertyId);
-    if (
-      !property?.buyerTracking ||
-      property.triggerPrice == null ||
-      property.userId == null
-    ) {
+    if (property?.userId == null) {
       return;
     }
-    const triggerPrice = Number(property.triggerPrice);
-    if (!Number.isFinite(triggerPrice) || budget < triggerPrice) {
+    const intent = await this.userIntentRepo.findLatestWithTargetPriceForOwner(
+      propertyId,
+      property.userId
+    );
+    if (!intent?.targetPrice) {
+      return;
+    }
+    const target = Number(intent.targetPrice);
+    if (!Number.isFinite(target) || budget < target) {
       return;
     }
     await this.sellerAlertService.createBuyerAboveTriggerAlertIfNew(
@@ -81,7 +90,7 @@ export class BuyerEngagementService {
       landArea: criteria.minLandArea ?? null,
       pool: criteria.pool ?? false,
     });
-    await this.maybeCreateTriggerPriceAlert(propertyId, criteria.budget);
+    await this.maybeCreateSellerBudgetAlert(propertyId, criteria.budget);
     return {
       engagementLevel: Number(created.engagementLevel) || 1,
       interested: Boolean(created.interested),
@@ -129,7 +138,7 @@ export class BuyerEngagementService {
           queryRunner
         );
         await queryRunner.commitTransaction();
-        await this.maybeCreateTriggerPriceAlert(propertyId, criteria.budget);
+        await this.maybeCreateSellerBudgetAlert(propertyId, criteria.budget);
         return {
           engagementLevel: created.engagementLevel,
           interested: created.interested,
@@ -161,7 +170,7 @@ export class BuyerEngagementService {
           queryRunner
         );
         await queryRunner.commitTransaction();
-        await this.maybeCreateTriggerPriceAlert(propertyId, criteria.budget);
+        await this.maybeCreateSellerBudgetAlert(propertyId, criteria.budget);
         return {
           engagementLevel: created.engagementLevel,
           interested: created.interested,

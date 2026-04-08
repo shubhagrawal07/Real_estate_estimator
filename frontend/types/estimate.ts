@@ -16,8 +16,6 @@ export interface PropertyEstimateResponse {
   type: string;
   status?: string;
   createdDate?: string;
-  triggerPrice?: number;
-  engagementLevel?: number;
   buyerTracking?: boolean;
   feedback?: EstimateFeedback;
   apartmentDetails?: Record<string, unknown>;
@@ -74,8 +72,6 @@ export interface BatchEngagementsResponse {
 export interface UpdateEngagementBody {
   feedback?: EstimateFeedback;
   buyerTracking?: boolean;
-  triggerPrice?: number;
-  engagementDelta?: number;
 }
 
 export interface BuyerInterestResponse {
