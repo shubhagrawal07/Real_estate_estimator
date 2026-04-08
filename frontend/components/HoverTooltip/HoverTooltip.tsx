@@ -100,7 +100,7 @@ export function HoverTooltip({ label, children, block = false }: HoverTooltipPro
 
   const mergedRef = (node: HTMLElement | null) => {
     triggerRef.current = node;
-    const r = child.ref;
+    const r = (child as ReactElement<HoverableChildProps> & { ref?: React.Ref<HTMLElement> }).ref;
     if (typeof r === 'function') {
       r(node);
     } else if (r != null && typeof r === 'object' && 'current' in r) {

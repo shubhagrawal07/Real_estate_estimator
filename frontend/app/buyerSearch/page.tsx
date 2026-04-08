@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { consumeBuyerToastFlag } from '@/components/intent/intentSession';
 import { buyerService } from '@/services/buyer.service';
 import styles from './page.module.css';
 
@@ -27,6 +28,17 @@ export default function BuyerSearchPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [buyerExploreToast, setBuyerExploreToast] = useState(false);
+
+  useEffect(() => {
+    if (!consumeBuyerToastFlag()) return;
+    const show = window.setTimeout(() => setBuyerExploreToast(true), 1000);
+    const hide = window.setTimeout(() => setBuyerExploreToast(false), 5000);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -146,9 +158,16 @@ export default function BuyerSearchPage() {
     }
   };
 
+  const toastEl = buyerExploreToast ? (
+    <div className={styles.intentToast} role="status">
+      Explore available properties in your area.
+    </div>
+  ) : null;
+
   if (!session) {
     return (
       <div className={styles.container}>
+        {toastEl}
         <div className={styles.notLoggedIn}>
           <p>Please log in to search for properties.</p>
         </div>
@@ -158,6 +177,7 @@ export default function BuyerSearchPage() {
 
   return (
     <div className={styles.container}>
+      {toastEl}
       <div className={styles.header}>
         <h1 className={styles.title}>Search Properties</h1>
         <p className={styles.subtitle}>Find properties that match your criteria</p>

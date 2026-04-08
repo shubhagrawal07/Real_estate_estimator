@@ -195,6 +195,28 @@ export class CityBlockSalesDataRepo {
   }
 
   /**
+   * Latest individual sales for UI (Flow D): same municipality (code_insee) and property type as valuation filters.
+   */
+  async findLatestSalesForPreview(
+    codeInsee: string,
+    propertyType: 'APPARTEMENT' | 'MAISON',
+    limit: number
+  ): Promise<CityBlockSalesData[]> {
+    const qb = this.repository
+      .createQueryBuilder('data')
+      .where('data.idpar LIKE :prefix', { prefix: `${codeInsee}%` });
+
+    if (propertyType === 'APPARTEMENT') {
+      qb.andWhere("UPPER(data.type) LIKE '%APPARTEMENT%'");
+      qb.andWhere("UPPER(data.type) NOT LIKE '%APPARTEMENT INDETERMINE%'");
+    } else {
+      qb.andWhere("UPPER(data.type) LIKE '%MAISON%'");
+    }
+
+    return qb.orderBy('data.date', 'DESC').take(limit).getMany();
+  }
+
+  /**
    * Gets aggregated data for a specific idpar
    * Aggregates all records matching the idpar and returns totals by type
    * Used by property estimate service for price calculations (fallback)

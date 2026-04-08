@@ -149,7 +149,7 @@ export class PropertyEstimateService {
 
     const { basePricePerSqM, estimatedPrice } =
       await this.valuationService.calculatePrice(dto);
-    return this.repo.updatePrice(propertyId, basePricePerSqM, estimatedPrice, 5);
+    return this.repo.updatePrice(propertyId, basePricePerSqM, estimatedPrice);
   }
 
   async deleteEstimate(propertyId: string): Promise<boolean> {

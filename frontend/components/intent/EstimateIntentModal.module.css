@@ -1,0 +1,185 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  box-sizing: border-box;
+}
+
+.dialog {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+  max-height: min(90vh, 640px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.closeX {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.closeX:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.body {
+  padding: 1.25rem 1.25rem 1.5rem;
+  padding-top: 2.75rem;
+}
+
+.title {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.subtle {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.optionGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.optionBtn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.9375rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.optionBtn:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.primaryBtn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border: 1px solid #0f172a;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #fff;
+  cursor: pointer;
+}
+
+.primaryBtn:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+
+.secondaryBtn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.9375rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.secondaryBtn:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.sliderRow {
+  margin: 1rem 0;
+}
+
+.slider {
+  width: 100%;
+  min-height: 44px;
+}
+
+.sliderValue {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.confirmIcon {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  color: #22c55e;
+}
+
+.dvfRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.dvfDot {
+  flex-shrink: 0;
+  color: #22c55e;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.loginHint {
+  font-size: 0.875rem;
+  color: #475569;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dialog {
+    max-width: 32rem;
+  }
+}
