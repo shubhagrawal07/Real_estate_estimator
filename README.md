@@ -1,5 +1,7 @@
 # Real Estate Price Estimator
 
+Updates on the way!!
+
 A full-stack application for estimating real estate property market values. Built with Express (backend), Next.js (frontend), and PostgreSQL (database).
 
 ## Features
