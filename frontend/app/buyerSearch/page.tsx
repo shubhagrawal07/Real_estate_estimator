@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { consumeBuyerToastFlag } from '@/components/intent/intentSession';
+import { DEFAULT_CITY_CODE_INSEE, VAR_CITIES_NEAR_TOULON } from '@/constants/varCitiesNearToulon';
 import { buyerService } from '@/services/buyer.service';
 import styles from './page.module.css';
 
@@ -20,6 +21,7 @@ export default function BuyerSearchPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     propertyType: 'Apartment' as 'Apartment' | 'House',
+    cityInseeCode: DEFAULT_CITY_CODE_INSEE,
     budget: 0,
     bedrooms: '',
     minSurfaceArea: 0,
@@ -40,7 +42,9 @@ export default function BuyerSearchPage() {
     };
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -48,7 +52,7 @@ export default function BuyerSearchPage() {
         name === 'budget' || name === 'minSurfaceArea' || name === 'minLandArea'
           ? (value === '' ? 0 : Number(value))
           : name === 'pool'
-            ? e.target.checked
+            ? (e.target as HTMLInputElement).checked
             : value,
     }));
     if (errors[name]) {
@@ -79,6 +83,10 @@ export default function BuyerSearchPage() {
 
     if (!formData.propertyType) {
       newErrors.propertyType = 'Property type is required';
+    }
+
+    if (!formData.cityInseeCode || !/^\d{5}$/.test(formData.cityInseeCode)) {
+      newErrors.cityInseeCode = 'Please select a city';
     }
 
     if (formData.budget === undefined || formData.budget < 0 || formData.budget > MAX_BUDGET) {
@@ -130,9 +138,13 @@ export default function BuyerSearchPage() {
     const token = session?.backendToken;
     if (!token) return;
     try {
+      const cityLabel = VAR_CITIES_NEAR_TOULON.find(
+        (c) => c.codeInsee === formData.cityInseeCode
+      )?.label;
+
       const payload = {
         propertyType: formData.propertyType,
-        cityInseeCode: '83137',
+        cityInseeCode: formData.cityInseeCode,
         budget: formData.budget,
         bedrooms: Number(formData.bedrooms),
         minSurfaceArea: formData.minSurfaceArea ?? 0,
@@ -146,6 +158,7 @@ export default function BuyerSearchPage() {
       sessionStorage.setItem('buyerSearchResults', JSON.stringify(data.properties));
       sessionStorage.setItem('buyerSearchCriteria', JSON.stringify({
         ...payload,
+        ...(cityLabel !== undefined ? { cityLabel } : {}),
         minSurfaceArea: formData.minSurfaceArea ?? 0,
         pool: formData.pool,
         minLandArea: formData.minLandArea ?? 0,
@@ -185,6 +198,29 @@ export default function BuyerSearchPage() {
 
       <div className={styles.formContainer}>
         <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.section}>
+            <label htmlFor="cityInseeCode" className={styles.sectionTitle}>
+              City <span className={styles.required}>*</span>
+            </label>
+            <select
+              id="cityInseeCode"
+              name="cityInseeCode"
+              value={formData.cityInseeCode}
+              onChange={handleChange}
+              className={`${styles.input} ${errors.cityInseeCode ? styles.error : ''}`}
+              aria-invalid={Boolean(errors.cityInseeCode)}
+            >
+              {VAR_CITIES_NEAR_TOULON.map((city) => (
+                <option key={city.codeInsee} value={city.codeInsee}>
+                  {city.label}
+                </option>
+              ))}
+            </select>
+            {errors.cityInseeCode && (
+              <span className={styles.errorText}>{errors.cityInseeCode}</span>
+            )}
+          </div>
+
           <div className={styles.section}>
             <span className={styles.sectionTitle}>
               Property Type <span className={styles.required}>*</span>

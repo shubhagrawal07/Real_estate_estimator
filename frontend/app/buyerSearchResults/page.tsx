@@ -10,6 +10,7 @@ import { buyerEngagementService } from '@/services/buyer-engagement.service';
 import Modal from '@/components/Modal';
 import { HoverTooltip } from '@/components/HoverTooltip';
 import { useBuyerChatbot, incrementBuyerSearchCount } from '@/hooks/useBuyerChatbot';
+import { getCityLabelForInsee } from '@/constants/varCitiesNearToulon';
 import type { BuyerSearchCriteria, FinancingStatus } from '@/types/estimate';
 import styles from './page.module.css';
 
@@ -570,7 +571,16 @@ export default function BuyerSearchResultsPage() {
         <p className={styles.subtitle}>
           Found {properties.length} {properties.length === 1 ? 'property' : 'properties'} matching your criteria
           {searchCriteria && (
-            <> • {searchCriteria.propertyType} • {searchCriteria.cityInseeCode}{searchCriteria.cadastralSection ? ` • Section ${searchCriteria.cadastralSection}` : ' • All sections'}</>
+            <>
+              {' '}
+              • {searchCriteria.propertyType} •{' '}
+              {searchCriteria.cityLabel ??
+                getCityLabelForInsee(searchCriteria.cityInseeCode) ??
+                searchCriteria.cityInseeCode}
+              {searchCriteria.cadastralSection
+                ? ` • Section ${searchCriteria.cadastralSection}`
+                : ' • All sections'}
+            </>
           )}
         </p>
       </div>

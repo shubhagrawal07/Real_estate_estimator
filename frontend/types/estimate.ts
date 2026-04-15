@@ -26,6 +26,8 @@ export interface PropertyEstimateResponse {
 export interface BuyerSearchCriteria {
   propertyType: string;
   cityInseeCode: string;
+  /** Display name for the selected city (optional; older session data may omit). */
+  cityLabel?: string;
   cadastralSection?: string;
   budget: number;
   bedrooms: number;
