@@ -9,6 +9,7 @@ import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-
 import { FavouriteProperty } from '../modules/favourite-property/favourite-property.model';
 import { BuyerEngagement } from '../modules/buyer-engagement/buyer-engagement.model';
 import { SellerAlert } from '../modules/seller-alert/seller-alert.model';
+import { UserIntent } from '../modules/user-intent/user-intent.model';
 import { config } from './env';
 import { logger } from '../utils/logger';
 
@@ -30,6 +31,7 @@ export const AppDataSource = new DataSource({
     FavouriteProperty,
     BuyerEngagement,
     SellerAlert,
+    UserIntent,
   ],
   synchronize: config.nodeEnv !== 'production',
 });
@@ -57,6 +59,7 @@ export const initializeDatabase = async (): Promise<void> => {
           FavouriteProperty,
           BuyerEngagement,
           SellerAlert,
+          UserIntent,
         ],
         synchronize: false, // Don't synchronize yet
       });
@@ -96,6 +99,7 @@ export const initializeDatabase = async (): Promise<void> => {
               FavouriteProperty,
               BuyerEngagement,
               SellerAlert,
+              UserIntent,
             ],
             synchronize: true, // Enable synchronize to create tables
           });

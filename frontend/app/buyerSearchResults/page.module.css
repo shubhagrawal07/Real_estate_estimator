@@ -213,6 +213,8 @@
   line-height: 1.4;
   padding-right: 3rem;
   padding-left: 2rem;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .propertyDetails {

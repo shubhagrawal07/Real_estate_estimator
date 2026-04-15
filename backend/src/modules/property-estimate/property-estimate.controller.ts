@@ -80,14 +80,10 @@ export async function updateEngagement(req: AuthenticatedRequest, res: Response)
   const body = req.body as {
     feedback?: 'accurate' | 'high' | 'low' | 'inaccurate';
     buyerTracking?: boolean;
-    triggerPrice?: number;
-    engagementDelta?: number;
   };
   const estimate = await propertyEstimateService.updateEngagement(id, userId, {
     feedback: body.feedback,
     buyerTracking: body.buyerTracking,
-    triggerPrice: body.triggerPrice,
-    engagementDelta: body.engagementDelta,
   });
   if (!estimate) {
     throw new AppError('Estimate not found or access denied', 404);

@@ -57,4 +57,21 @@ export const config = {
     baseUrl: process.env.DVF_API_BASE_URL || 'https://apidf-preprod.cerema.fr/dvf_opendata/mutations/',
     timeoutMs: parseInt(process.env.DVF_API_TIMEOUT_MS || '90000', 10),
   },
+  /** JSON map: location_code (full or code_insee prefix) → agent user UUID */
+  agentByLocationMap: parseAgentByLocationMap(process.env.AGENT_BY_LOCATION_MAP),
 };
+
+function parseAgentByLocationMap(raw: string | undefined): Record<string, string> {
+  if (!raw || raw.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === 'string' && v.length > 0) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}

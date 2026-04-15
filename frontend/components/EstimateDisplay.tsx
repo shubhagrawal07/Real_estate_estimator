@@ -38,7 +38,7 @@ function EstimateDisplay({ estimate, onRecalculate, loading }: EstimateDisplayPr
     if (!price) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EUR',
       maximumFractionDigits: 0,
     }).format(price);
   };

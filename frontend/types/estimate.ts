@@ -16,8 +16,6 @@ export interface PropertyEstimateResponse {
   type: string;
   status?: string;
   createdDate?: string;
-  triggerPrice?: number;
-  engagementLevel?: number;
   buyerTracking?: boolean;
   feedback?: EstimateFeedback;
   apartmentDetails?: Record<string, unknown>;
@@ -28,6 +26,8 @@ export interface PropertyEstimateResponse {
 export interface BuyerSearchCriteria {
   propertyType: string;
   cityInseeCode: string;
+  /** Display name for the selected city (optional; older session data may omit). */
+  cityLabel?: string;
   cadastralSection?: string;
   budget: number;
   bedrooms: number;
@@ -74,8 +74,6 @@ export interface BatchEngagementsResponse {
 export interface UpdateEngagementBody {
   feedback?: EstimateFeedback;
   buyerTracking?: boolean;
-  triggerPrice?: number;
-  engagementDelta?: number;
 }
 
 export interface BuyerInterestResponse {

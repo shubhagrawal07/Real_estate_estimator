@@ -8,7 +8,9 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { favouritePropertyService } from '@/services/favourite-property.service';
 import { buyerEngagementService } from '@/services/buyer-engagement.service';
 import Modal from '@/components/Modal';
+import { HoverTooltip } from '@/components/HoverTooltip';
 import { useBuyerChatbot, incrementBuyerSearchCount } from '@/hooks/useBuyerChatbot';
+import { getCityLabelForInsee } from '@/constants/varCitiesNearToulon';
 import type { BuyerSearchCriteria, FinancingStatus } from '@/types/estimate';
 import styles from './page.module.css';
 
@@ -569,7 +571,16 @@ export default function BuyerSearchResultsPage() {
         <p className={styles.subtitle}>
           Found {properties.length} {properties.length === 1 ? 'property' : 'properties'} matching your criteria
           {searchCriteria && (
-            <> • {searchCriteria.propertyType} • {searchCriteria.cityInseeCode}{searchCriteria.cadastralSection ? ` • Section ${searchCriteria.cadastralSection}` : ' • All sections'}</>
+            <>
+              {' '}
+              • {searchCriteria.propertyType} •{' '}
+              {searchCriteria.cityLabel ??
+                getCityLabelForInsee(searchCriteria.cityInseeCode) ??
+                searchCriteria.cityInseeCode}
+              {searchCriteria.cadastralSection
+                ? ` • Section ${searchCriteria.cadastralSection}`
+                : ' • All sections'}
+            </>
           )}
         </p>
       </div>
@@ -590,36 +601,61 @@ export default function BuyerSearchResultsPage() {
                 onClick={() => handlePropertyClick(property)}
               >
                 <div className={styles.propertyRank}>#{index + 1}</div>
-                <button
-                  className={`${styles.favouriteButton} ${
-                    favourites[property.propertyId] ? styles.favouriteActive : ''
-                  }`}
-                  onClick={(e) => toggleFavourite(property.propertyId, e)}
-                  disabled={updatingFavourites[property.propertyId]}
-                  title={favourites[property.propertyId] ? 'Remove from favorites' : 'Add to favorites'}
+                <HoverTooltip
+                  label={
+                    favourites[property.propertyId]
+                      ? 'Remove from favorites'
+                      : 'Save to favorites'
+                  }
                 >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill={favourites[property.propertyId] ? '#e74c3c' : 'none'}
-                    stroke={favourites[property.propertyId] ? '#e74c3c' : '#999'}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <button
+                    type="button"
+                    className={`${styles.favouriteButton} ${
+                      favourites[property.propertyId] ? styles.favouriteActive : ''
+                    }`}
+                    onClick={(e) => toggleFavourite(property.propertyId, e)}
+                    disabled={updatingFavourites[property.propertyId]}
+                    aria-label={
+                      favourites[property.propertyId]
+                        ? 'Remove from favorites'
+                        : 'Save to favorites'
+                    }
                   >
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.interestedButton} ${
-                    interested[property.propertyId] ? styles.interestedActive : ''
-                  }`}
-                  onClick={(e) => toggleInterested(property.propertyId, e)}
-                  disabled={updatingInterested[property.propertyId]}
-                  title={interested[property.propertyId] ? 'Mark as not interested' : 'Mark as interested'}
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill={favourites[property.propertyId] ? '#e74c3c' : 'none'}
+                      stroke={favourites[property.propertyId] ? '#e74c3c' : '#999'}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                  </button>
+                </HoverTooltip>
+                <HoverTooltip
+                  label={
+                    interested[property.propertyId]
+                      ? 'Mark as not interested'
+                      : 'Mark as interested'
+                  }
                 >
+                  <button
+                    type="button"
+                    className={`${styles.interestedButton} ${
+                      interested[property.propertyId] ? styles.interestedActive : ''
+                    }`}
+                    onClick={(e) => toggleInterested(property.propertyId, e)}
+                    disabled={updatingInterested[property.propertyId]}
+                    aria-label={
+                      interested[property.propertyId]
+                        ? 'Mark as not interested'
+                        : 'Mark as interested'
+                    }
+                  >
                   {interested[property.propertyId] ? (
                     <svg
                       width="18"
@@ -636,7 +672,8 @@ export default function BuyerSearchResultsPage() {
                   ) : (
                     <span className={styles.interestedLabel}>Interested</span>
                   )}
-                </button>
+                  </button>
+                </HoverTooltip>
                 <div className={styles.propertyItemContent}>
                   <div className={styles.propertyAddress}>{property.address}</div>
                   <div className={styles.propertyDetails}>
