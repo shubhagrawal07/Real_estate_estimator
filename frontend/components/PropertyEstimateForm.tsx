@@ -286,6 +286,10 @@ export default function PropertyEstimateForm({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
+  const handleNumberInputWheel = (event: React.WheelEvent<HTMLInputElement>) => {
+    event.currentTarget.blur();
+  };
+
   const validateStep = (step: number): boolean => {
     if (step === 1) {
       return Boolean(
@@ -505,7 +509,35 @@ export default function PropertyEstimateForm({
       <p className={styles.stepDescription}>Slide or tap the buttons to adjust.</p>
 
       <div className={styles.section}>
-        <span className={styles.sectionTitle}>Surface (m²)</span>
+        <div className={styles.sectionHeader}>
+          <span className={styles.sectionTitle}>Surface (m²)</span>
+          <div className={styles.inlineValueInput}>
+            <input
+              type="number"
+              min={MIN_AREA}
+              max={MAX_AREA}
+              value={formData.area}
+              onWheel={handleNumberInputWheel}
+              onFocus={(event) => {
+                event.target.select();
+              }}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (!isNaN(value) && value >= 0 && value <= MAX_AREA) {
+                  setField('area', Math.max(0, Math.round(value)));
+                }
+              }}
+              onBlur={(event) => {
+                const value = Number(event.target.value);
+                if (!isNaN(value) && value >= 0 && value <= MAX_AREA) {
+                  setField('area', Math.max(0, Math.round(value)));
+                }
+              }}
+              className={styles.sliderInput}
+            />
+            <span className={styles.unitLabel}>m²</span>
+          </div>
+        </div>
         <div className={styles.sliderRow}>
           <button
             type="button"
@@ -529,29 +561,6 @@ export default function PropertyEstimateForm({
           >
             +
           </button>
-          <input
-            type="number"
-            min={MIN_AREA}
-            max={MAX_AREA}
-            value={formData.area}
-            onFocus={(event) => {
-              event.target.select();
-            }}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (!isNaN(value) && value >= 0 && value <= MAX_AREA) {
-                setField('area', Math.max(0, Math.round(value)));
-              }
-            }}
-            onBlur={(event) => {
-              const value = Number(event.target.value);
-              if (!isNaN(value) && value >= 0 && value <= MAX_AREA) {
-                setField('area', Math.max(0, Math.round(value)));
-              }
-            }}
-            className={styles.sliderInput}
-          />
-          <span className={styles.unitLabel}>m²</span>
         </div>
       </div>
 
@@ -694,7 +703,35 @@ export default function PropertyEstimateForm({
       ) : (
         <>
           <div className={styles.section}>
-            <span className={styles.sectionTitle}>Land size (m²)</span>
+            <div className={styles.sectionHeader}>
+              <span className={styles.sectionTitle}>Land size (m²)</span>
+              <div className={styles.inlineValueInput}>
+                <input
+                  type="number"
+                  min={MIN_LAND_SIZE}
+                  max={MAX_LAND_SIZE}
+                  value={landSize}
+                  onWheel={handleNumberInputWheel}
+                  onFocus={(event) => {
+                    event.target.select();
+                  }}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= MAX_LAND_SIZE) {
+                      setField('landSize', Math.max(0, Math.round(value)));
+                    }
+                  }}
+                  onBlur={(event) => {
+                    const value = Number(event.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= MAX_LAND_SIZE) {
+                      setField('landSize', Math.max(0, Math.round(value)));
+                    }
+                  }}
+                  className={styles.sliderInput}
+                />
+                <span className={styles.unitLabel}>m²</span>
+              </div>
+            </div>
             <div className={styles.sliderRow}>
               <button
                 type="button"
@@ -718,29 +755,6 @@ export default function PropertyEstimateForm({
               >
                 +
               </button>
-              <input
-                type="number"
-                min={MIN_LAND_SIZE}
-                max={MAX_LAND_SIZE}
-                value={landSize}
-                onFocus={(event) => {
-                  event.target.select();
-                }}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  if (!isNaN(value) && value >= 0 && value <= MAX_LAND_SIZE) {
-                    setField('landSize', Math.max(0, Math.round(value)));
-                  }
-                }}
-                onBlur={(event) => {
-                  const value = Number(event.target.value);
-                  if (!isNaN(value) && value >= 0 && value <= MAX_LAND_SIZE) {
-                    setField('landSize', Math.max(0, Math.round(value)));
-                  }
-                }}
-                className={styles.sliderInput}
-              />
-              <span className={styles.unitLabel}>m²</span>
             </div>
           </div>
 

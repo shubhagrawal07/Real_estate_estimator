@@ -78,6 +78,10 @@ export default function BuyerSearchPage() {
     }
   };
 
+  const handleNumberInputWheel = (event: React.WheelEvent<HTMLInputElement>) => {
+    event.currentTarget.blur();
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -253,9 +257,44 @@ export default function BuyerSearchPage() {
           </div>
 
           <div className={styles.section}>
-            <span className={styles.sectionTitle}>
-              Budget (€) <span className={styles.required}>*</span>
-            </span>
+            <div className={styles.sectionHeader}>
+              <span className={styles.sectionTitle}>
+                Budget (€) <span className={styles.required}>*</span>
+              </span>
+              <div className={styles.inlineValueInput}>
+                <input
+                  type="number"
+                  min={MIN_BUDGET}
+                  max={MAX_BUDGET}
+                  step={BUDGET_STEP}
+                  value={formData.budget}
+                  onWheel={handleNumberInputWheel}
+                  onFocus={(event) => {
+                    event.target.select();
+                  }}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= MAX_BUDGET) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        budget: Math.max(0, Math.round(value)),
+                      }));
+                    }
+                  }}
+                  onBlur={(event) => {
+                    const value = Number(event.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= MAX_BUDGET) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        budget: Math.max(0, Math.round(value)),
+                      }));
+                    }
+                  }}
+                  className={`${styles.sliderInput} ${errors.budget ? styles.error : ''}`}
+                />
+                <span className={styles.unitLabel}>€</span>
+              </div>
+            </div>
             <div className={styles.sliderRow}>
               <button
                 type="button"
@@ -288,36 +327,6 @@ export default function BuyerSearchPage() {
               >
                 +
               </button>
-              <input
-                type="number"
-                min={MIN_BUDGET}
-                max={MAX_BUDGET}
-                step={BUDGET_STEP}
-                value={formData.budget}
-                onFocus={(event) => {
-                  event.target.select();
-                }}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  if (!isNaN(value) && value >= 0 && value <= MAX_BUDGET) {
-                    setFormData((prev) => ({
-                      ...prev,
-                      budget: Math.max(0, Math.round(value)),
-                    }));
-                  }
-                }}
-                onBlur={(event) => {
-                  const value = Number(event.target.value);
-                  if (!isNaN(value) && value >= 0 && value <= MAX_BUDGET) {
-                    setFormData((prev) => ({
-                      ...prev,
-                      budget: Math.max(0, Math.round(value)),
-                    }));
-                  }
-                }}
-                className={`${styles.sliderInput} ${errors.budget ? styles.error : ''}`}
-              />
-              <span className={styles.unitLabel}>€</span>
             </div>
             {errors.budget && (
               <span className={styles.errorText}>{errors.budget}</span>
@@ -333,6 +342,7 @@ export default function BuyerSearchPage() {
               id="bedrooms"
               name="bedrooms"
               value={formData.bedrooms}
+              onWheel={handleNumberInputWheel}
               onChange={handleChange}
               placeholder="e.g., 3"
               min="0"
@@ -351,6 +361,7 @@ export default function BuyerSearchPage() {
               id="minSurfaceArea"
               name="minSurfaceArea"
               value={formData.minSurfaceArea === 0 ? '' : formData.minSurfaceArea}
+              onWheel={handleNumberInputWheel}
               onChange={handleChange}
               placeholder="e.g., 70"
               min={MIN_AREA}
@@ -385,6 +396,7 @@ export default function BuyerSearchPage() {
                   id="minLandArea"
                   name="minLandArea"
                   value={formData.minLandArea === 0 ? '' : formData.minLandArea}
+                  onWheel={handleNumberInputWheel}
                   onChange={handleChange}
                   placeholder="e.g., 500"
                   min={MIN_LAND_AREA}

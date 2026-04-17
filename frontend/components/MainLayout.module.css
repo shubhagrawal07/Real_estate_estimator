@@ -263,6 +263,8 @@
   font-size: 0.875rem;
   line-height: 1.4;
   color: #111;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notificationDismiss {
@@ -410,6 +412,22 @@
   padding: 1rem;
   transition: margin-left 0.3s ease;
   min-width: 0;
+}
+
+/* Narrow viewports: anchor panel to the viewport so it never overflows horizontally */
+@media (max-width: 768px) {
+  .notificationDropdown {
+    position: fixed;
+    left: max(0.75rem, env(safe-area-inset-left, 0px));
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    top: calc(var(--layout-header-offset) + env(safe-area-inset-top, 0px) + 0.25rem);
+    width: auto;
+    max-width: none;
+    margin-top: 0;
+    max-height: min(70vh, 22rem);
+    z-index: 1100;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Tablet / desktop: show sidebar, hide burger, expand main */
