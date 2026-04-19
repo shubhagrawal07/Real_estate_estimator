@@ -10,4 +10,12 @@ export class ConsoleEmailSender implements EmailSender {
       body: payload.body,
     });
   }
+
+  async sendBuyerIntentEmail(payload: SellerIntentEmailPayload): Promise<void> {
+    logger.info('AgentEmailStub sendBuyerIntentEmail', {
+      to: payload.toAgentEmail ?? '(not configured)',
+      subject: payload.subject,
+      body: payload.body,
+    });
+  }
 }

@@ -5,18 +5,18 @@ import { useRouter } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 import { propertyEstimateService } from '@/services/property-estimate.service';
-import { userIntentService } from '@/services/user-intent.service';
+import { sellerIntentService } from '@/services/seller-intent.service';
 import type { PropertyEstimateResponse } from '@/types/estimate';
 import type {
-  CreateUserIntentPayload,
+  CreateSellerIntentPayload,
   DvfPreviewRow,
   SellPreference,
   Timeline,
-} from '@/types/user-intent';
+} from '@/types/seller-intent';
 import {
-  flushPendingUserIntent,
+  flushPendingSellerIntent,
   navigateAfterSellerIntent,
-} from '@/lib/flush-pending-user-intent';
+} from '@/lib/flush-pending-seller-intent';
 import { IntentFlowBanner } from './IntentFlowBanner';
 import {
   clearPendingIntent,
@@ -179,10 +179,10 @@ export function EstimateIntentModal({ estimate, onEstimateRefresh }: EstimateInt
   }, [estimate.propertyId, token, onEstimateRefresh]);
 
   const submitIntent = useCallback(
-    async (payload: CreateUserIntentPayload): Promise<void> => {
+    async (payload: CreateSellerIntentPayload): Promise<void> => {
       if (!token) throw new Error('Not authenticated');
       await linkDraftIfNeeded();
-      await userIntentService.create(payload, token);
+      await sellerIntentService.create(payload, token);
     },
     [linkDraftIfNeeded, token]
   );
@@ -203,7 +203,7 @@ export function EstimateIntentModal({ estimate, onEstimateRefresh }: EstimateInt
       if (token) {
         void (async () => {
           try {
-            await flushPendingUserIntent(resume, token);
+            await flushPendingSellerIntent(resume, token);
             clearPendingIntent();
             navigateAfterSellerIntent(resume, router);
             writeModalSession(resume.propertyId, { completed: true });
@@ -225,7 +225,7 @@ export function EstimateIntentModal({ estimate, onEstimateRefresh }: EstimateInt
     if (!estimate.propertyId) return;
     setDvfLoading(true);
     try {
-      const res = await userIntentService.getDvfPreview(estimate.propertyId);
+      const res = await sellerIntentService.getDvfPreview(estimate.propertyId);
       setDvfRows(res.data?.rows ?? []);
     } catch {
       setDvfRows([]);

@@ -10,7 +10,6 @@ import {
   recalculate,
   remove,
   updateEngagement,
-  getBuyerInterest,
   getPotentialBuyers,
 } from './property-estimate.controller';
 import { asyncHandler } from '../../middleware/error.middleware';
@@ -32,12 +31,6 @@ router.patch(
   validateParams(idParamSchema),
   validateBody(updateEngagementBodySchema),
   asyncHandler(updateEngagement)
-);
-router.get(
-  '/:id/buyer-interest',
-  authenticateToken,
-  validateParams(idParamSchema),
-  asyncHandler(getBuyerInterest)
 );
 router.get(
   '/:id/potential-buyers',

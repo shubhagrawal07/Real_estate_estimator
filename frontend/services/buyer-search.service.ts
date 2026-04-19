@@ -12,7 +12,7 @@ export interface BuyerSearchParams {
   minLandArea?: number;
 }
 
-export const buyerService = {
+export const buyerSearchService = {
   search: (params: BuyerSearchParams, token: string) =>
     api.post<{ properties: RankedProperty[]; count: number }>(
       '/buyer/search',

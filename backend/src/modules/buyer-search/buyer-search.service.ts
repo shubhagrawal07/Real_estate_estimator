@@ -37,9 +37,15 @@ export interface RankedProperty {
   bedroomScore: number;
   poolScore?: number;
   landAreaScore?: number;
+  /** INSEE city code from property location (for client-side zone filtering). */
+  cityInseeCode: string;
+  /** Cadastral section from location code, uppercase (may be placeholder e.g. "00"). */
+  cadastralSection: string;
+  /** Full location code for clients that need to re-parse (e.g. older session data). */
+  locationCode: string;
 }
 
-export class BuyerService {
+export class BuyerSearchService {
   private propertyRepo: PropertyEstimateRepo;
 
   constructor() {
@@ -49,13 +55,17 @@ export class BuyerService {
   /**
    * Search and rank properties based on buyer criteria.
    * When cadastralSection is omitted, matches all cadastral sections in the city.
+   * @param excludeUserId — logged-in buyer; their own listings are omitted from results.
    */
-  async searchProperties(searchDto: BuyerSearchDto): Promise<RankedProperty[]> {
+  async searchProperties(searchDto: BuyerSearchDto, excludeUserId?: string): Promise<RankedProperty[]> {
     const allProperties = await this.propertyRepo.findAll();
     const matchByCityOnly = !searchDto.cadastralSection || searchDto.cadastralSection.length === 0;
 
     // Filter properties by city (and optionally cadastral section) and property type
     const filteredProperties = allProperties.filter((property) => {
+      if (excludeUserId && property.userId === excludeUserId) {
+        return false;
+      }
       const propertyLocation = parseLocationCode(property.locationCode);
       if (!propertyLocation) return false;
 
@@ -69,6 +79,9 @@ export class BuyerService {
     });
 
     const rankedProperties: RankedProperty[] = filteredProperties.map((property) => {
+      const loc = parseLocationCode(property.locationCode);
+      const cityInseeCode = loc?.codeInsee ?? '';
+      const cadastralSection = loc?.cadastralSection ?? '';
       const budgetScore = this.calculateBudgetScore(searchDto.budget, property.estimatedPrice || 0);
       const surfaceAreaScore = this.calculateSurfaceAreaScore(
         searchDto.minSurfaceArea,
@@ -105,6 +118,9 @@ export class BuyerService {
         budgetScore,
         surfaceAreaScore,
         bedroomScore,
+        cityInseeCode,
+        cadastralSection,
+        locationCode: property.locationCode,
         ...(poolScore !== undefined && { poolScore }),
         ...(landAreaScore !== undefined && { landAreaScore }),
       };
@@ -161,4 +177,3 @@ export class BuyerService {
     return Math.round(score * 100) / 100;
   }
 }
-

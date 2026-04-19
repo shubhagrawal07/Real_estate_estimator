@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { ProfileType, IntentType, Timeline, SellPreference } from './user-intent.model';
+import { ProfileType, IntentType, Timeline, SellPreference } from './seller-intent.model';
 
 const uuid = z.string().uuid();
 
-export const createUserIntentBodySchema = z.object({
+export const createSellerIntentBodySchema = z.object({
   propertyId: uuid,
   profileType: z.nativeEnum(ProfileType),
   intentType: z.nativeEnum(IntentType).optional().nullable(),
@@ -14,7 +14,7 @@ export const createUserIntentBodySchema = z.object({
   notifyAgent: z.boolean().optional().default(false),
 });
 
-export type CreateUserIntentBody = z.infer<typeof createUserIntentBodySchema>;
+export type CreateSellerIntentBody = z.infer<typeof createSellerIntentBodySchema>;
 
 export const propertyIdParamSchema = z.object({
   propertyId: uuid,

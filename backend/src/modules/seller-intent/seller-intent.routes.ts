@@ -2,16 +2,16 @@ import { Router } from 'express';
 import { authenticateToken } from '../../middleware/auth.middleware';
 import { asyncHandler } from '../../middleware/error.middleware';
 import { validateBody, validateParams } from '../../middleware/validate-zod.middleware';
-import { createUserIntent, getDvfPreview } from './user-intent.controller';
-import { createUserIntentBodySchema, propertyIdParamSchema } from './user-intent.schemas';
+import { createSellerIntent, getDvfPreview } from './seller-intent.controller';
+import { createSellerIntentBodySchema, propertyIdParamSchema } from './seller-intent.schemas';
 
 const router = Router();
 
 router.post(
   '/',
   authenticateToken,
-  validateBody(createUserIntentBodySchema),
-  asyncHandler(createUserIntent)
+  validateBody(createSellerIntentBodySchema),
+  asyncHandler(createSellerIntent)
 );
 
 router.get(

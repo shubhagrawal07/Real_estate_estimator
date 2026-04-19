@@ -178,6 +178,40 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+.intentMenuButton {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.intentMenuButton:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.intentBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.intentBadge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+}
+
 .potentialBuyersButton {
   width: 100%;
   flex: 1 1 auto;
@@ -607,6 +641,11 @@
 
   .viewMapButton {
     flex: 0 0 auto;
+  }
+
+  .potentialBuyersButton {
+    flex: 0 0 auto;
+    width: auto;
   }
 
   .modalContent {

@@ -3,6 +3,7 @@ import { PropertyEstimateRepo } from '../property-estimate/property-estimate.rep
 import { serializeEstimates } from '../property-estimate/serialize-estimate.util';
 import type { PropertyEstimate } from '../property-estimate/property-estimate.model';
 import type { FavouriteProperty } from './favourite-property.model';
+import { AppError } from '../../utils/AppError';
 
 export class FavouritePropertyService {
   private favouriteRepo: FavouritePropertyRepo;
@@ -17,6 +18,13 @@ export class FavouritePropertyService {
     alreadyExists: boolean;
     favourite?: FavouriteProperty;
   }> {
+    const property = await this.propertyRepo.findOne(propertyId);
+    if (!property) {
+      throw new AppError('Property not found', 404);
+    }
+    if (property.userId && property.userId === userId) {
+      throw new AppError('You cannot add your own property to favorites', 400);
+    }
     const existing = await this.favouriteRepo.findByUserAndProperty(userId, propertyId);
     if (existing) {
       return { alreadyExists: true };

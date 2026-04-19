@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { favouritePropertyService } from '@/services/favourite-property.service';
-import { buyerEngagementService } from '@/services/buyer-engagement.service';
-import Modal from '@/components/Modal';
 import { HoverTooltip } from '@/components/HoverTooltip';
-import { useBuyerChatbot, incrementBuyerSearchCount } from '@/hooks/useBuyerChatbot';
 import { getCityLabelForInsee } from '@/constants/varCitiesNearToulon';
-import type { BuyerSearchCriteria, FinancingStatus } from '@/types/estimate';
+import type { BuyerSearchCriteria, RankedProperty } from '@/types/estimate';
+import {
+  hasConcreteCadastralSection,
+  normalizeRanked,
+  sameZone,
+  zoneKey,
+} from '@/lib/buyer-intent-zoning';
+import { BuyerPropertyIntentModal } from '@/components/buyer-intent/BuyerPropertyIntentModal';
+import type { BuyerIntentModalProperty } from '@/components/buyer-intent/BuyerPropertyIntentModal';
+import { buyerIntentService } from '@/services/buyer-intent.service';
+import type { BuyerIntentFlags } from '@/types/buyer-intent';
 import styles from './page.module.css';
 
 const PROPERTIES_SOURCE_ID = 'properties';
@@ -46,23 +53,6 @@ function loadImageAsPromise(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
-}
-
-interface RankedProperty {
-  propertyId: string;
-  address: string;
-  latitude?: number;
-  longitude?: number;
-  estimatedPrice?: number;
-  type: string;
-  area: number;
-  bedrooms: number;
-  rankScore: number;
-  budgetScore: number;
-  surfaceAreaScore: number;
-  bedroomScore: number;
-  poolScore?: number;
-  landAreaScore?: number;
 }
 
 type MatchLevel = 'Strong match' | 'High match' | 'Possible match';
@@ -117,25 +107,11 @@ export default function BuyerSearchResultsPage() {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [favourites, setFavourites] = useState<Record<string, boolean>>({});
   const [updatingFavourites, setUpdatingFavourites] = useState<Record<string, boolean>>({});
-  const [interested, setInterested] = useState<Record<string, boolean>>({});
-  const [updatingInterested, setUpdatingInterested] = useState<Record<string, boolean>>({});
+  const [intentFlags, setIntentFlags] = useState<Record<string, BuyerIntentFlags>>({});
+  const [intentModalOpen, setIntentModalOpen] = useState(false);
+  const [intentModalProperty, setIntentModalProperty] = useState<RankedProperty | null>(null);
+  const allResultsRef = useRef<RankedProperty[]>([]);
   const searchCriteriaRef = useRef<BuyerSearchCriteria | null>(null);
-
-  const interestedCount = Object.values(interested).filter(Boolean).length;
-  const chatbot = useBuyerChatbot({
-    token: session?.backendToken,
-    searchCriteria,
-    interestedCount,
-  });
-
-  const openFinancialStatusRef = useRef(chatbot.openFinancialStatus);
-  openFinancialStatusRef.current = chatbot.openFinancialStatus;
-
-  const openFinancialModal = useCallback((propertyId: string) => {
-    requestAnimationFrame(() => {
-      openFinancialStatusRef.current(propertyId);
-    });
-  }, []);
 
   useEffect(() => {
     searchCriteriaRef.current = searchCriteria;
@@ -153,17 +129,18 @@ export default function BuyerSearchResultsPage() {
     }
 
     try {
-      const results = JSON.parse(storedResults);
+      const results = JSON.parse(storedResults) as unknown[];
       const criteria = storedCriteria ? JSON.parse(storedCriteria) : null;
-      setProperties(results);
+      const normalized = results.map((row) => normalizeRanked(row));
+      allResultsRef.current = normalized;
+      setProperties(normalized);
       setSearchCriteria(criteria);
       setLoading(false);
-      incrementBuyerSearchCount();
-      
-      if (session?.backendToken && results.length > 0) {
-        const ids = results.map((p: RankedProperty) => p.propertyId);
+
+      if (session?.backendToken && normalized.length > 0) {
+        const ids = normalized.map((p) => p.propertyId);
         loadFavourites(ids);
-        loadEngagements(ids);
+        void loadIntentFlags(ids);
       }
     } catch (err) {
       setError('Failed to load search results');
@@ -183,62 +160,14 @@ export default function BuyerSearchResultsPage() {
     }
   };
 
-  const loadEngagements = async (propertyIds: string[]) => {
-    if (!token) return;
+  const loadIntentFlags = async (propertyIds: string[]) => {
+    if (!token || propertyIds.length === 0) return;
     try {
-      const engagements = await buyerEngagementService.checkBatch(propertyIds, token);
-      setInterested(
-        Object.fromEntries(
-          Object.entries(engagements).map(([id, r]) => [id, r.interested])
-        )
-      );
+      const map = await buyerIntentService.batchFlags(propertyIds, token);
+      setIntentFlags(map);
     } catch {
       // Silent fail
     }
-  };
-
-  const recordEngagementClick = (propertyId: string) => {
-    const criteria = searchCriteriaRef.current;
-    if (!token || !criteria) return;
-    const budget = Number(criteria.budget);
-    const bedrooms = Number(criteria.bedrooms);
-    const minSurfaceArea = Number(criteria.minSurfaceArea);
-    const minLandAreaRaw =
-      criteria.minLandArea != null && String(criteria.minLandArea).trim() !== ''
-        ? Number(criteria.minLandArea)
-        : undefined;
-    const minLandArea =
-      minLandAreaRaw != null && Number.isFinite(minLandAreaRaw)
-        ? minLandAreaRaw
-        : undefined;
-    buyerEngagementService
-      .recordClick(
-        propertyId,
-        {
-          budget: Number.isFinite(budget) ? budget : 0,
-          bedrooms: Number.isFinite(bedrooms) ? bedrooms : 0,
-          minSurfaceArea: Number.isFinite(minSurfaceArea) ? minSurfaceArea : 0,
-          pool: Boolean(criteria.pool),
-          minLandArea: minLandArea ?? undefined,
-        },
-        token
-      )
-      .then((response) => {
-        const data =
-          response != null && typeof response === 'object' && 'data' in response
-            ? (response as { data: Record<string, unknown> }).data
-            : (response as unknown) as Record<string, unknown>;
-        const level =
-          typeof (data?.engagementLevel as number | undefined) === 'number'
-            ? (data.engagementLevel as number)
-            : typeof (data?.engagement_level as number | undefined) === 'number'
-              ? (data.engagement_level as number)
-              : Number(data?.engagementLevel ?? data?.engagement_level);
-        if (Number.isFinite(level) && level >= 10) {
-          setTimeout(() => openFinancialModal(propertyId), 50);
-        }
-      })
-      .catch(() => {});
   };
 
   const toggleFavourite = async (propertyId: string, e: React.MouseEvent) => {
@@ -263,64 +192,6 @@ export default function BuyerSearchResultsPage() {
       alert(err instanceof Error ? err.message : 'Failed to update favorite');
     } finally {
       setUpdatingFavourites((prev) => {
-        const newState = { ...prev };
-        delete newState[propertyId];
-        return newState;
-      });
-    }
-  };
-
-  const toggleInterested = async (propertyId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!token) return;
-    const criteria = searchCriteriaRef.current;
-    if (!criteria) return;
-    if (updatingInterested[propertyId]) return;
-
-    setUpdatingInterested((prev) => ({ ...prev, [propertyId]: true }));
-
-    setInterested((prev) => ({
-      ...prev,
-      [propertyId]: !prev[propertyId],
-    }));
-
-    try {
-      const payload = {
-        budget: Number.isFinite(Number(criteria.budget)) ? Number(criteria.budget) : 0,
-        bedrooms: Number.isFinite(Number(criteria.bedrooms)) ? Number(criteria.bedrooms) : 0,
-        minSurfaceArea: Number.isFinite(Number(criteria.minSurfaceArea)) ? Number(criteria.minSurfaceArea) : 0,
-        pool: Boolean(criteria.pool),
-        minLandArea:
-          criteria.minLandArea != null &&
-          String(criteria.minLandArea).trim() !== '' &&
-          Number.isFinite(Number(criteria.minLandArea))
-            ? Number(criteria.minLandArea)
-            : undefined,
-      };
-      const result = await buyerEngagementService.toggleInterested(
-        propertyId,
-        payload,
-        token
-      );
-      const data = result != null && typeof result === 'object' && 'data' in result
-        ? (result as { data: { interested?: boolean } }).data
-        : (result as { interested?: boolean });
-      const isInterested = data?.interested === true;
-      setInterested((prev) => ({ ...prev, [propertyId]: isInterested }));
-      if (isInterested) {
-        openFinancialModal(propertyId);
-      }
-      const ids = properties.map((p) => p.propertyId);
-      if (ids.length > 0) {
-        loadEngagements(ids);
-      }
-    } catch {
-      setInterested((prev) => ({
-        ...prev,
-        [propertyId]: !prev[propertyId],
-      }));
-    } finally {
-      setUpdatingInterested((prev) => {
         const newState = { ...prev };
         delete newState[propertyId];
         return newState;
@@ -356,6 +227,14 @@ export default function BuyerSearchResultsPage() {
       'pin',
     ]);
   }, [selectedPropertyId, mapLoaded]);
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    const src = map.current.getSource(PROPERTIES_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+    if (src) {
+      src.setData(buildPropertiesGeoJSON(properties));
+    }
+  }, [properties, mapLoaded]);
 
   const initializeMap = () => {
     if (!mapContainer.current || map.current) return;
@@ -422,7 +301,6 @@ export default function BuyerSearchResultsPage() {
         if (!property) return;
         const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
         if (!coords || coords.length < 2) return;
-        recordEngagementClick(propertyId);
         setSelectedPropertyId(propertyId);
         popup.current?.setLngLat(coords).setHTML(createPopupHTML(property)).addTo(m);
         m.flyTo({ center: coords, zoom: 15, duration: 1000 });
@@ -492,7 +370,6 @@ export default function BuyerSearchResultsPage() {
   };
 
   const handlePropertyClick = (property: RankedProperty) => {
-    recordEngagementClick(property.propertyId);
     setSelectedPropertyId(property.propertyId);
     const lat = Number(property.latitude);
     const lng = Number(property.longitude);
@@ -520,6 +397,45 @@ export default function BuyerSearchResultsPage() {
       currency: 'EUR',
       maximumFractionDigits: 0,
     }).format(price);
+  };
+
+  const toModalProperty = (p: RankedProperty): BuyerIntentModalProperty => ({
+    propertyId: p.propertyId,
+    address: p.address,
+    budget: searchCriteriaRef.current?.budget,
+    cityInseeCode: p.cityInseeCode,
+    cadastralSection: p.cadastralSection,
+    locationCode: p.locationCode,
+  });
+
+  const handleIntentSaved = (propertyId: string) => {
+    const ids = properties.map((p) => p.propertyId);
+    if (token && ids.length > 0) {
+      void loadIntentFlags(ids);
+    } else if (token) {
+      void loadIntentFlags([propertyId]);
+    }
+  };
+
+  const handleAreaInterestFromResults = (anchor: BuyerIntentModalProperty) => {
+    const full = allResultsRef.current.find((p) => p.propertyId === anchor.propertyId);
+    if (!full) return;
+    const next = allResultsRef.current.filter((p) => sameZone(p, full));
+    setProperties(next);
+    setSelectedPropertyId(null);
+    popup.current?.remove();
+    const crit = searchCriteriaRef.current;
+    if (crit) {
+      const { city, section } = zoneKey(full);
+      const updated: BuyerSearchCriteria = {
+        ...crit,
+        cityInseeCode: city || crit.cityInseeCode,
+        cadastralSection: hasConcreteCadastralSection(section) ? section : crit.cadastralSection,
+      };
+      setSearchCriteria(updated);
+      sessionStorage.setItem('buyerSearchCriteria', JSON.stringify(updated));
+    }
+    sessionStorage.setItem('buyerSearchResults', JSON.stringify(next));
   };
 
   if (!session) {
@@ -636,42 +552,18 @@ export default function BuyerSearchResultsPage() {
                     </svg>
                   </button>
                 </HoverTooltip>
-                <HoverTooltip
-                  label={
-                    interested[property.propertyId]
-                      ? 'Mark as not interested'
-                      : 'Mark as interested'
-                  }
-                >
+                <HoverTooltip label="Your interest in this property">
                   <button
                     type="button"
-                    className={`${styles.interestedButton} ${
-                      interested[property.propertyId] ? styles.interestedActive : ''
-                    }`}
-                    onClick={(e) => toggleInterested(property.propertyId, e)}
-                    disabled={updatingInterested[property.propertyId]}
-                    aria-label={
-                      interested[property.propertyId]
-                        ? 'Mark as not interested'
-                        : 'Mark as interested'
-                    }
+                    className={styles.intentMenuButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIntentModalProperty(property);
+                      setIntentModalOpen(true);
+                    }}
+                    aria-label="Property actions"
                   >
-                  {interested[property.propertyId] ? (
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#16a34a"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                  ) : (
-                    <span className={styles.interestedLabel}>Interested</span>
-                  )}
+                    ⋯
                   </button>
                 </HoverTooltip>
                 <div className={styles.propertyItemContent}>
@@ -691,6 +583,17 @@ export default function BuyerSearchResultsPage() {
                   <div className={`${styles.propertyScore} ${getMatchLevelClass(getMatchLabel(property.rankScore))}`}>
                     {getMatchLabel(property.rankScore)}
                   </div>
+                  {(intentFlags[property.propertyId]?.highInterest ||
+                    intentFlags[property.propertyId]?.alertActive) && (
+                    <div className={styles.intentBadgeRow}>
+                      {intentFlags[property.propertyId]?.highInterest && (
+                        <span className={styles.intentBadge}>● You&apos;re interested</span>
+                      )}
+                      {intentFlags[property.propertyId]?.alertActive && (
+                        <span className={styles.intentBadge}>🔔 Alert active</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -700,105 +603,17 @@ export default function BuyerSearchResultsPage() {
         <div className={styles.mapContainer} ref={mapContainer} />
       </div>
 
-      <Modal
-        open={chatbot.showAlertPrompt}
-        onClose={chatbot.dismissAlertPrompt}
-        title="Save or mark interested to activate alert"
-        dismissLabel="Close"
-      >
-        <p className={styles.chatbotMessage}>
-          Save properties to your list or mark &quot;Interested&quot; to get alerts when something changes.
-        </p>
-        <button
-          type="button"
-          className={styles.chatbotPrimaryButton}
-          onClick={chatbot.dismissAlertPrompt}
-        >
-          Got it
-        </button>
-      </Modal>
-
-      <Modal
-        key={`financial-${chatbot.financialModalKey}`}
-        open={chatbot.showFinancialStatus}
-        onClose={chatbot.closeFinancialStatus}
-        title="What are your financial status?"
-        dismissLabel="Close"
-      >
-        <div className={styles.chatbotOptions}>
-          {(
-            [
-              { value: 'ready_to_buy' as FinancingStatus, label: 'Ready to buy' },
-              { value: 'in_progress' as FinancingStatus, label: 'In progress' },
-              { value: 'not_yet' as FinancingStatus, label: 'Not yet (just browsing)' },
-              { value: 'need_to_sell_first' as FinancingStatus, label: 'Need to sell first' },
-            ]
-          ).map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              className={styles.chatbotOptionButton}
-              onClick={() => chatbot.onFinancialStatusSelect(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </Modal>
-
-      <Modal
-        open={chatbot.showScheduleCall}
-        onClose={() => chatbot.onScheduleCallSelect(false)}
-        title="A local specialist can help you decide"
-        dismissLabel="Close"
-      >
-        <div className={styles.chatbotOptions}>
-          <button
-            type="button"
-            className={styles.chatbotPrimaryButton}
-            onClick={() => chatbot.onScheduleCallSelect(true)}
-          >
-            Schedule a call with the agent
-          </button>
-          <button
-            type="button"
-            className={styles.chatbotOptionButton}
-            onClick={() => chatbot.onScheduleCallSelect(false)}
-          >
-            Not yet
-          </button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={chatbot.showThanks}
-        onClose={chatbot.closeThanks}
-        title="Thanks for your feedback"
-        dismissLabel="Close"
-      >
-        <p className={styles.chatbotMessage}>Your interest has been recorded.</p>
-        <p className={styles.chatbotMessage}>
-          We will notify you if this property evolves or if a similar opportunity appears.
-        </p>
-      </Modal>
-
-      <Modal
-        open={chatbot.showScheduleCallConfirmed}
-        onClose={chatbot.closeScheduleCallConfirmed}
-        title="Agent will contact you soon…"
-        dismissLabel="Close"
-      >
-        <p className={styles.chatbotMessage}>
-          An agent will reach out to you shortly to help with your property search.
-        </p>
-        <button
-          type="button"
-          className={styles.chatbotPrimaryButton}
-          onClick={chatbot.closeScheduleCallConfirmed}
-        >
-          OK
-        </button>
-      </Modal>
+      <BuyerPropertyIntentModal
+        open={intentModalOpen}
+        onClose={() => {
+          setIntentModalOpen(false);
+          setIntentModalProperty(null);
+        }}
+        property={intentModalProperty ? toModalProperty(intentModalProperty) : null}
+        token={token}
+        onSaved={handleIntentSaved}
+        onAreaInterest={handleAreaInterestFromResults}
+      />
     </div>
   );
 }

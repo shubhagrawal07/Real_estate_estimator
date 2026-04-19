@@ -5,9 +5,9 @@ import { PropertyType } from '../property-estimate/property-estimate.model';
 import { getCodeInseeFromLocationCode } from '../property-estimate/utils/location-code.util';
 import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sales-data.repo';
 import { UserRepo } from '../user/user.repo';
-import { UserIntentRepo } from './user-intent.repo';
-import { ProfileType, UserIntent } from './user-intent.model';
-import type { CreateUserIntentBody } from './user-intent.schemas';
+import { SellerIntentRepo } from './seller-intent.repo';
+import { ProfileType, SellerIntent } from './seller-intent.model';
+import type { CreateSellerIntentBody } from './seller-intent.schemas';
 import { AgentIntentNotificationService } from './agent-intent-notification.service';
 import { ConsoleEmailSender } from './console-email-sender';
 
@@ -39,18 +39,18 @@ function monthsAgoApprox(saleDate: Date): number {
   return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24 * 30.44)));
 }
 
-export class UserIntentService {
+export class SellerIntentService {
   private propertyRepo: PropertyEstimateRepo;
   private salesRepo: CityBlockSalesDataRepo;
   private userRepo: UserRepo;
-  private intentRepo: UserIntentRepo;
+  private intentRepo: SellerIntentRepo;
   private notifyService: AgentIntentNotificationService;
 
   constructor() {
     this.propertyRepo = new PropertyEstimateRepo();
     this.salesRepo = new CityBlockSalesDataRepo();
     this.userRepo = new UserRepo();
-    this.intentRepo = new UserIntentRepo();
+    this.intentRepo = new SellerIntentRepo();
     this.notifyService = new AgentIntentNotificationService(new ConsoleEmailSender());
   }
 
@@ -78,7 +78,7 @@ export class UserIntentService {
     return { rows };
   }
 
-  async createIntent(userId: string, body: CreateUserIntentBody): Promise<UserIntent> {
+  async createIntent(userId: string, body: CreateSellerIntentBody): Promise<SellerIntent> {
     const property = await this.propertyRepo.findOne(body.propertyId);
     if (!property) {
       throw new AppError('Estimate not found', 404);

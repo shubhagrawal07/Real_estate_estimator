@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
 import PotentialBuyersModal from '@/components/PotentialBuyersModal';
@@ -9,6 +9,14 @@ import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyE
 import { getPriceRangeIn5000 } from '@/lib/price-range';
 import { propertyEstimateService } from '@/services/property-estimate.service';
 import { favouritePropertyService } from '@/services/favourite-property.service';
+import { buyerSearchService } from '@/services/buyer-search.service';
+import { buyerIntentService } from '@/services/buyer-intent.service';
+import { BuyerPropertyIntentModal } from '@/components/buyer-intent/BuyerPropertyIntentModal';
+import type { BuyerIntentModalProperty } from '@/components/buyer-intent/BuyerPropertyIntentModal';
+import { getCityLabelForInsee } from '@/constants/varCitiesNearToulon';
+import { zoneFieldsFromLocationCode } from '@/lib/location-code';
+import { hasConcreteCadastralSection, normalizeRanked } from '@/lib/buyer-intent-zoning';
+import type { BuyerIntentFlags } from '@/types/buyer-intent';
 import styles from './page.module.css';
 
 interface PropertyEstimate {
@@ -37,6 +45,23 @@ interface PropertyEstimate {
 
 type TabType = 'estimates' | 'favourites';
 
+function toBuyerIntentModalProperty(estimate: EstimateItem): BuyerIntentModalProperty {
+  const rec = estimate as Record<string, unknown>;
+  const lc = typeof rec.locationCode === 'string' ? rec.locationCode : '';
+  const z = zoneFieldsFromLocationCode(lc);
+  return {
+    propertyId: estimate.propertyId,
+    address: estimate.address,
+    budget:
+      typeof estimate.estimatedPrice === 'number' && estimate.estimatedPrice > 0
+        ? Math.round(estimate.estimatedPrice)
+        : undefined,
+    cityInseeCode: z.cityInseeCode,
+    cadastralSection: z.cadastralSection,
+    locationCode: lc,
+  };
+}
+
 export default function MyEstimatesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('estimates');
@@ -61,9 +86,11 @@ export default function MyEstimatesPage() {
     show: false,
     propertyId: null,
   });
-  /** Modal open for this propertyId; later we may hide the entry point when buyerTracking is false. */
+  const [intentModalOpen, setIntentModalOpen] = useState(false);
+  const [intentModalProperty, setIntentModalProperty] = useState<BuyerIntentModalProperty | null>(null);
+  const [intentFlags, setIntentFlags] = useState<Record<string, BuyerIntentFlags>>({});
+  const intentContextEstimateRef = useRef<EstimateItem | null>(null);
   const [potentialBuyersPropertyId, setPotentialBuyersPropertyId] = useState<string | null>(null);
-
   const error = activeTab === 'estimates' ? errorEstimates : errorFavourites;
 
   useEffect(() => {
@@ -76,6 +103,23 @@ export default function MyEstimatesPage() {
   useEffect(() => {
     if (activeTab === 'favourites') setSelectedEstimate(null);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!token || activeTab === 'estimates') {
+      setIntentFlags({});
+      return;
+    }
+    const list = favourites;
+    if (list.length === 0) {
+      setIntentFlags({});
+      return;
+    }
+    const ids = list.map((e) => e.propertyId);
+    void buyerIntentService
+      .batchFlags(ids, token)
+      .then(setIntentFlags)
+      .catch(() => {});
+  }, [token, activeTab, favourites]);
 
   const fetchEstimate = async (estimateId: string) => {
     setLoading(true);
@@ -143,6 +187,65 @@ export default function MyEstimatesPage() {
     setDeleteConfirm({ show: false, propertyId: null });
   };
 
+  const handleMyEstimatesAreaNavigate = async (_prop: BuyerIntentModalProperty) => {
+    const est = intentContextEstimateRef.current;
+    if (!token || !est) return;
+    const rec = est as Record<string, unknown>;
+    const lc = typeof rec.locationCode === 'string' ? rec.locationCode : '';
+    const z = zoneFieldsFromLocationCode(lc);
+    const cityInseeCode = z.cityInseeCode;
+    if (!cityInseeCode) {
+      window.alert('Unable to determine area for this property.');
+      return;
+    }
+    const cadastralSection = hasConcreteCadastralSection(z.cadastralSection)
+      ? z.cadastralSection
+      : undefined;
+    const propertyType = est.type === 'House' ? 'House' : 'Apartment';
+    const budget = Math.max(
+      1,
+      typeof est.estimatedPrice === 'number' && est.estimatedPrice > 0
+        ? Math.round(est.estimatedPrice)
+        : 400000
+    );
+    const bedrooms = typeof est.bedrooms === 'number' ? est.bedrooms : 0;
+    const minSurfaceArea =
+      typeof est.area === 'number' ? Math.max(0, Math.floor(est.area * 0.7)) : 0;
+    try {
+      const data = await buyerSearchService.search(
+        {
+          propertyType,
+          cityInseeCode,
+          cadastralSection,
+          budget,
+          bedrooms,
+          minSurfaceArea,
+          pool: false,
+        },
+        token
+      );
+      const normalized = data.properties.map((p) => normalizeRanked(p));
+      sessionStorage.setItem('buyerSearchResults', JSON.stringify(normalized));
+      const cityLabel = getCityLabelForInsee(cityInseeCode);
+      sessionStorage.setItem(
+        'buyerSearchCriteria',
+        JSON.stringify({
+          propertyType,
+          cityInseeCode,
+          cityLabel: cityLabel ?? cityInseeCode,
+          cadastralSection: cadastralSection ?? '',
+          budget,
+          bedrooms,
+          minSurfaceArea,
+          pool: false,
+        })
+      );
+      router.push('/buyerSearchResults');
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Search failed');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -159,6 +262,8 @@ export default function MyEstimatesPage() {
       maximumFractionDigits: 0,
     }).format(price);
   };
+
+  const isBuyerTrackingEnabled = (estimate: EstimateItem) => estimate.buyerTracking !== false;
 
   if (!token) {
     return (
@@ -254,6 +359,18 @@ export default function MyEstimatesPage() {
                           })()
                         : 'N/A'}
                     </div>
+                    {activeTab === 'favourites' &&
+                      (intentFlags[estimate.propertyId]?.highInterest ||
+                        intentFlags[estimate.propertyId]?.alertActive) && (
+                        <div className={styles.intentBadgeRow}>
+                          {intentFlags[estimate.propertyId]?.highInterest && (
+                            <span className={styles.intentBadge}>● You&apos;re interested</span>
+                          )}
+                          {intentFlags[estimate.propertyId]?.alertActive && (
+                            <span className={styles.intentBadge}>🔔 Alert active</span>
+                          )}
+                        </div>
+                      )}
                   </div>
                   <div className={styles.estimateActions}>
                     <HoverTooltip label="View on map" block>
@@ -270,8 +387,8 @@ export default function MyEstimatesPage() {
                         🗺️ View on Map
                       </button>
                     </HoverTooltip>
-                    {activeTab === 'estimates' && (
-                      <HoverTooltip label="Buyers who clicked or showed interest (anonymous)" block>
+                    {activeTab === 'estimates' && isBuyerTrackingEnabled(estimate) && (
+                      <HoverTooltip label="Buyers who expressed intent on this listing (anonymous)" block>
                         <button
                           type="button"
                           className={styles.potentialBuyersButton}
@@ -286,6 +403,23 @@ export default function MyEstimatesPage() {
                       </HoverTooltip>
                     )}
                     <div className={styles.estimateIconActions}>
+                      {activeTab === 'favourites' && (
+                        <HoverTooltip label="Your interest in this property">
+                          <button
+                            type="button"
+                            className={styles.intentMenuButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              intentContextEstimateRef.current = estimate;
+                              setIntentModalProperty(toBuyerIntentModalProperty(estimate));
+                              setIntentModalOpen(true);
+                            }}
+                            aria-label="Property actions"
+                          >
+                            ⋯
+                          </button>
+                        </HoverTooltip>
+                      )}
                       {activeTab === 'estimates' && (
                         <HoverTooltip label="Delete this estimate">
                           <button
@@ -363,6 +497,29 @@ export default function MyEstimatesPage() {
           </div>
         )}
       </div>
+
+      <BuyerPropertyIntentModal
+        open={intentModalOpen}
+        onClose={() => {
+          setIntentModalOpen(false);
+          setIntentModalProperty(null);
+          intentContextEstimateRef.current = null;
+        }}
+        property={intentModalProperty}
+        token={token}
+        onSaved={async () => {
+          if (activeTab !== 'favourites') return;
+          const ids = favourites.map((e) => e.propertyId);
+          if (!token || ids.length === 0) return;
+          try {
+            const m = await buyerIntentService.batchFlags(ids, token);
+            setIntentFlags(m);
+          } catch {
+            // ignore
+          }
+        }}
+        onAreaInterest={handleMyEstimatesAreaNavigate}
+      />
 
       <PotentialBuyersModal
         open={potentialBuyersPropertyId !== null}

@@ -54,6 +54,7 @@ interface PropertyEstimate {
   type: string;
   area: number;
   bedrooms: number;
+  buyerTracking?: boolean;
 }
 
 function buildPropertiesGeoJSON(properties: PropertyEstimate[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
@@ -418,7 +419,7 @@ function MyPropertiesMapContent() {
   }
 
   const listSource = searchParams?.get('source') || 'estimates';
-  const showPotentialBuyersButton = listSource !== 'favourites';
+  const showPotentialBuyersEntry = listSource !== 'favourites';
 
   if (properties.length === 0) {
     const source = listSource;
@@ -483,19 +484,21 @@ function MyPropertiesMapContent() {
                     )}
                   </div>
                   <div className={styles.propertyPrice}>{formatPrice(property.estimatedPrice)}</div>
-                  {showPotentialBuyersButton && token && (
-                    <button
-                      type="button"
-                      className={styles.potentialBuyersButton}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPotentialBuyersPropertyId(property.propertyId);
-                      }}
-                      aria-label="Potential buyers"
-                    >
-                      Potential buyers
-                    </button>
-                  )}
+                  {showPotentialBuyersEntry &&
+                    token &&
+                    property.buyerTracking !== false && (
+                      <button
+                        type="button"
+                        className={styles.potentialBuyersButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPotentialBuyersPropertyId(property.propertyId);
+                        }}
+                        aria-label="Potential buyers"
+                      >
+                        Potential buyers
+                      </button>
+                    )}
                 </div>
               </div>
             ))}

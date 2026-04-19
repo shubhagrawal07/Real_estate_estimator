@@ -1,7 +1,7 @@
 import type { PendingResume } from '@/components/intent/intentSession';
 import { propertyEstimateService } from '@/services/property-estimate.service';
-import { userIntentService } from '@/services/user-intent.service';
-import type { CreateUserIntentPayload } from '@/types/user-intent';
+import { sellerIntentService } from '@/services/seller-intent.service';
+import type { CreateSellerIntentPayload } from '@/types/seller-intent';
 
 async function linkDraftIfNeeded(propertyId: string, token: string): Promise<void> {
   const drafts = JSON.parse(localStorage.getItem('draftEstimates') || '[]') as string[];
@@ -13,11 +13,11 @@ async function linkDraftIfNeeded(propertyId: string, token: string): Promise<voi
   );
 }
 
-export async function flushPendingUserIntent(resume: PendingResume, token: string): Promise<void> {
+export async function flushPendingSellerIntent(resume: PendingResume, token: string): Promise<void> {
   await linkDraftIfNeeded(resume.propertyId, token);
 
   if (resume.kind === 'A_CONFIRM' || resume.kind === 'B_CONFIRM') {
-    const payload: CreateUserIntentPayload = {
+    const payload: CreateSellerIntentPayload = {
       propertyId: resume.propertyId,
       profileType: resume.kind === 'A_CONFIRM' ? 'SELLER' : 'SELLER_BUYER',
       intentType: 'SELL_INTENT',
@@ -26,12 +26,12 @@ export async function flushPendingUserIntent(resume: PendingResume, token: strin
       sellPreference: resume.sellPreference,
       notifyAgent: resume.notifyAgent,
     };
-    await userIntentService.create(payload, token);
+    await sellerIntentService.create(payload, token);
     return;
   }
 
   if (resume.kind === 'C_BUYER') {
-    await userIntentService.create(
+    await sellerIntentService.create(
       {
         propertyId: resume.propertyId,
         profileType: 'BUYER',
@@ -44,7 +44,7 @@ export async function flushPendingUserIntent(resume: PendingResume, token: strin
   }
 
   if (resume.kind === 'D_WATCH') {
-    await userIntentService.create(
+    await sellerIntentService.create(
       {
         propertyId: resume.propertyId,
         profileType: 'CURIOUS',

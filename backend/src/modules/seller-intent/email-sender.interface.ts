@@ -10,4 +10,6 @@ export interface SellerIntentEmailPayload {
 
 export interface EmailSender {
   sendSellerIntentEmail(payload: SellerIntentEmailPayload): Promise<void>;
+  /** Stub / future SMTP: buyer interest or question to agent. */
+  sendBuyerIntentEmail(payload: SellerIntentEmailPayload): Promise<void>;
 }

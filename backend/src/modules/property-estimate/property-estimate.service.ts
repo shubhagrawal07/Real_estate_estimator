@@ -1,5 +1,4 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
-import { BuyerEngagementRepo, type PotentialBuyerRow } from '../buyer-engagement/buyer-engagement.repo';
 import {
   PropertyEstimate,
   PropertyType,
@@ -12,7 +11,36 @@ import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sale
 import { OutdoorSpace } from './entities/apartment-details.model';
 import { PoolOption, ExteriorLayoutQuality } from './entities/house-details.model';
 import { PropertyEstimateValuationService } from './property-estimate-valuation.service';
+import { BuyerIntentRepo } from '../buyer-intent/buyer-intent.repo';
+import { BuyerIntentType } from '../buyer-intent/buyer-intent.model';
 import { AppError } from '../../utils/AppError';
+
+/** Anonymous seller-facing row (legacy shape; criteria from buyer intent). */
+export interface PotentialBuyerEntry {
+  budget: number | null;
+  bedrooms: number;
+  surfaceMin: number;
+  landArea?: number | null;
+  pool: boolean;
+  engagementLevel: number;
+  interested: boolean;
+  /** When set, shown instead of bedrooms/surface line (buyer intent has no search grid). */
+  criteriaSummary?: string;
+}
+
+const INTENT_WEIGHT: Record<BuyerIntentType, number> = {
+  [BuyerIntentType.HIGH_INTEREST]: 100,
+  [BuyerIntentType.QUESTION]: 80,
+  [BuyerIntentType.ALERT_AVAILABLE]: 50,
+  [BuyerIntentType.AREA_INTEREST]: 30,
+};
+
+const INTENT_LABEL: Record<BuyerIntentType, string> = {
+  [BuyerIntentType.HIGH_INTEREST]: 'High interest',
+  [BuyerIntentType.QUESTION]: 'Question',
+  [BuyerIntentType.ALERT_AVAILABLE]: 'Availability alert',
+  [BuyerIntentType.AREA_INTEREST]: 'Area interest',
+};
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -61,12 +89,12 @@ export interface CreatePropertyEstimateDto {
 export class PropertyEstimateService {
   private repo: PropertyEstimateRepo;
   private valuationService: PropertyEstimateValuationService;
-  private buyerEngagementRepo: BuyerEngagementRepo;
+  private buyerIntentRepo: BuyerIntentRepo;
 
   constructor() {
     this.repo = new PropertyEstimateRepo();
     this.valuationService = new PropertyEstimateValuationService();
-    this.buyerEngagementRepo = new BuyerEngagementRepo();
+    this.buyerIntentRepo = new BuyerIntentRepo();
   }
 
   async createEstimate(
@@ -178,19 +206,10 @@ export class PropertyEstimateService {
     return this.repo.updateEngagement(propertyId, data, userId);
   }
 
-  async getBuyerInterest(propertyId: string): Promise<{ hasHighBuyerInterest: boolean }> {
-    const maxLevel = await this.buyerEngagementRepo.getMaxEngagementLevelByPropertyId(propertyId);
-    return { hasHighBuyerInterest: maxLevel >= 10 };
-  }
-
   /**
-   * Returns anonymous buyer engagement rows for a property. Only the property owner may call this.
-   * (Visibility in the UI may later be gated by buyerTracking; the API allows the owner regardless.)
+   * One row per buyer (user) with aggregated buyer_intent signals. Owner only; requires buyer tracking.
    */
-  async getPotentialBuyers(
-    propertyId: string,
-    userId: string
-  ): Promise<PotentialBuyerRow[]> {
+  async getPotentialBuyers(propertyId: string, userId: string): Promise<PotentialBuyerEntry[]> {
     const property = await this.repo.findOne(propertyId);
     if (!property) {
       throw new AppError('Estimate not found', 404);
@@ -198,6 +217,58 @@ export class PropertyEstimateService {
     if (property.userId !== userId) {
       throw new AppError('You do not have permission to view potential buyers for this property', 403);
     }
-    return this.buyerEngagementRepo.findByPropertyIdAnonymous(propertyId);
+    if (property.buyerTracking === false) {
+      throw new AppError('Buyer tracking is disabled for this property', 403);
+    }
+
+    const rows = await this.buyerIntentRepo.findByPropertyId(propertyId);
+    if (rows.length === 0) return [];
+
+    const byUser = new Map<
+      string,
+      { types: Set<BuyerIntentType>; budgets: number[]; maxWeight: number }
+    >();
+    for (const row of rows) {
+      const uid = row.userId;
+      let g = byUser.get(uid);
+      if (!g) {
+        g = { types: new Set(), budgets: [], maxWeight: 0 };
+        byUser.set(uid, g);
+      }
+      g.types.add(row.intentType);
+      const w = INTENT_WEIGHT[row.intentType] ?? 0;
+      if (w > g.maxWeight) g.maxWeight = w;
+      if (row.budget != null && Number.isFinite(Number(row.budget))) {
+        g.budgets.push(Number(row.budget));
+      }
+    }
+
+    const entries: PotentialBuyerEntry[] = [];
+    for (const [, g] of byUser) {
+      const typesArr = [...g.types].sort((a, b) => (INTENT_WEIGHT[b] ?? 0) - (INTENT_WEIGHT[a] ?? 0));
+      const criteriaSummary = typesArr.map((t) => INTENT_LABEL[t]).join(' · ');
+      const budgetMax =
+        g.budgets.length > 0 ? Math.max(...g.budgets) : null;
+      const interested =
+        g.types.has(BuyerIntentType.HIGH_INTEREST) || g.types.has(BuyerIntentType.QUESTION);
+      entries.push({
+        budget: budgetMax,
+        bedrooms: 0,
+        surfaceMin: 0,
+        landArea: null,
+        pool: false,
+        engagementLevel: g.maxWeight,
+        interested,
+        criteriaSummary,
+      });
+    }
+
+    entries.sort((a, b) => {
+      if (b.engagementLevel !== a.engagementLevel) return b.engagementLevel - a.engagementLevel;
+      const ba = a.budget ?? -1;
+      const bb = b.budget ?? -1;
+      return bb - ba;
+    });
+    return entries;
   }
 }

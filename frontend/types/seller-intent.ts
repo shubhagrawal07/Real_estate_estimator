@@ -12,7 +12,7 @@ export type Timeline = 'NOW' | 'THREE_MONTHS' | 'SIX_MONTHS' | 'UNDEFINED';
 
 export type SellPreference = 'DISCREET' | 'CLASSIC' | 'UNDEFINED';
 
-export interface CreateUserIntentPayload {
+export interface CreateSellerIntentPayload {
   propertyId: string;
   profileType: ProfileType;
   intentType?: IntentType | null;
@@ -34,7 +34,7 @@ export interface DvfPreviewResponse {
   data: { rows: DvfPreviewRow[] };
 }
 
-export interface UserIntentCreateResponse {
+export interface SellerIntentCreateResponse {
   success: boolean;
   data: {
     id: string;

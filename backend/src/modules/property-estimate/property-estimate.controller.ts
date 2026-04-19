@@ -91,16 +91,6 @@ export async function updateEngagement(req: AuthenticatedRequest, res: Response)
   res.json(serializeEstimate(estimate));
 }
 
-export async function getBuyerInterest(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const id = (req.params as { id: string }).id;
-  const estimate = await propertyEstimateService.findOne(id);
-  if (!estimate) {
-    throw new AppError('Estimate not found', 404);
-  }
-  const result = await propertyEstimateService.getBuyerInterest(id);
-  res.json(result);
-}
-
 export async function getPotentialBuyers(req: AuthenticatedRequest, res: Response): Promise<void> {
   const userId = requireUserId(req);
   const id = (req.params as { id: string }).id;

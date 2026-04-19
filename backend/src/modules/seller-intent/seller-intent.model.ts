@@ -38,8 +38,8 @@ export enum SellPreference {
   UNDEFINED = 'UNDEFINED',
 }
 
-@Entity('user_intent')
-export class UserIntent {
+@Entity('seller_intent')
+export class SellerIntent {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 

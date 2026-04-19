@@ -7,12 +7,50 @@ import { Zone } from '../modules/zone/zone.model';
 import { Subscription } from '../modules/subscription/subscription.model';
 import { CityBlockSalesData } from '../modules/city-block-sales-data/city-block-sales-data.model';
 import { FavouriteProperty } from '../modules/favourite-property/favourite-property.model';
-import { BuyerEngagement } from '../modules/buyer-engagement/buyer-engagement.model';
 import { SellerAlert } from '../modules/seller-alert/seller-alert.model';
-import { UserIntent } from '../modules/user-intent/user-intent.model';
+import { SellerIntent } from '../modules/seller-intent/seller-intent.model';
+import { BuyerIntent } from '../modules/buyer-intent/buyer-intent.model';
 import { config } from './env';
 import { refreshCityBlockSalesDataFromSqlFile } from './city-block-sales-sql-seed';
 import { logger } from '../utils/logger';
+
+/**
+ * If PostgreSQL still has the legacy table `user_intent`, rename it to `seller_intent`.
+ * Runs before AppDataSource init so production (synchronize: false) and dev DBs keep existing rows.
+ */
+async function ensurePostgresSellerIntentTableName(): Promise<void> {
+  const migrationDataSource = new DataSource({
+    type: 'postgres',
+    host: config.db.host,
+    port: config.db.port,
+    username: config.db.username,
+    password: config.db.password,
+    database: config.db.database,
+    entities: [],
+    synchronize: false,
+  });
+
+  await migrationDataSource.initialize();
+  try {
+    await migrationDataSource.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_schema = 'public' AND table_name = 'user_intent'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_schema = 'public' AND table_name = 'seller_intent'
+        ) THEN
+          ALTER TABLE user_intent RENAME TO seller_intent;
+        END IF;
+      END
+      $$;
+    `);
+  } finally {
+    await migrationDataSource.destroy();
+  }
+}
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -30,15 +68,17 @@ export const AppDataSource = new DataSource({
     Subscription,
     CityBlockSalesData,
     FavouriteProperty,
-    BuyerEngagement,
     SellerAlert,
-    UserIntent,
+    SellerIntent,
+    BuyerIntent,
   ],
   synchronize: config.nodeEnv !== 'production',
 });
 
 export const initializeDatabase = async (): Promise<void> => {
   try {
+    await ensurePostgresSellerIntentTableName();
+
     // In production, check if tables exist first
     if (config.nodeEnv === 'production') {
       // Create a temporary connection to check if database is empty
@@ -58,9 +98,9 @@ export const initializeDatabase = async (): Promise<void> => {
           Subscription,
           CityBlockSalesData,
           FavouriteProperty,
-          BuyerEngagement,
           SellerAlert,
-          UserIntent,
+          SellerIntent,
+          BuyerIntent,
         ],
         synchronize: false, // Don't synchronize yet
       });
@@ -98,9 +138,9 @@ export const initializeDatabase = async (): Promise<void> => {
               Subscription,
               CityBlockSalesData,
               FavouriteProperty,
-              BuyerEngagement,
               SellerAlert,
-              UserIntent,
+              SellerIntent,
+              BuyerIntent,
             ],
             synchronize: true, // Enable synchronize to create tables
           });

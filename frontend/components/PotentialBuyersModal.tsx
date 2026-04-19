@@ -21,7 +21,13 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
+function formatBudget(entry: PotentialBuyerEntry): string {
+  if (entry.budget == null || entry.budget <= 0) return '—';
+  return formatPrice(entry.budget);
+}
+
 function formatCriteria(entry: PotentialBuyerEntry): string {
+  if (entry.criteriaSummary) return entry.criteriaSummary;
   return `${entry.bedrooms} bed · ${entry.surfaceMin} m² min`;
 }
 
@@ -57,12 +63,7 @@ export default function PotentialBuyersModal({
   }, [open, propertyId, token]);
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Potential Buyers"
-      dismissLabel="Close"
-    >
+    <Modal open={open} onClose={onClose} title="Potential Buyers" dismissLabel="Close">
       <div className={styles.content}>
         {loading && <p className={styles.message}>Loading…</p>}
         {error && !loading && (
@@ -76,14 +77,20 @@ export default function PotentialBuyersModal({
         {!loading && !error && list.length > 0 && (
           <ul className={styles.list} aria-label="Potential buyers">
             {list.map((entry, index) => (
-              <li key={index} className={styles.item}>
+              <li
+                key={`${entry.engagementLevel}-${entry.budget ?? 'x'}-${entry.criteriaSummary ?? index}-${index}`}
+                className={styles.item}
+              >
                 <span className={styles.itemIcon} aria-hidden="true">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
+                    <path
+                      d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z"
+                      fill="currentColor"
+                    />
                   </svg>
                 </span>
                 <div className={styles.itemContent}>
-                  <span className={styles.budget}>{formatPrice(entry.budget)}</span>
+                  <span className={styles.budget}>{formatBudget(entry)}</span>
                   <span className={styles.criteria}>{formatCriteria(entry)}</span>
                 </div>
                 <span className={styles.status}>

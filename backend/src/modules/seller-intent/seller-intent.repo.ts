@@ -1,8 +1,14 @@
 import { Repository } from 'typeorm';
 import { AppDataSource } from '../../config/db';
-import { UserIntent, type ProfileType, type IntentType, type Timeline, type SellPreference } from './user-intent.model';
+import {
+  SellerIntent,
+  type ProfileType,
+  type IntentType,
+  type Timeline,
+  type SellPreference,
+} from './seller-intent.model';
 
-export interface CreateUserIntentRow {
+export interface CreateSellerIntentRow {
   userId: string;
   propertyId: string;
   profileType: ProfileType;
@@ -14,14 +20,14 @@ export interface CreateUserIntentRow {
   notifSent: boolean;
 }
 
-export class UserIntentRepo {
-  private repository: Repository<UserIntent>;
+export class SellerIntentRepo {
+  private repository: Repository<SellerIntent>;
 
   constructor() {
-    this.repository = AppDataSource.getRepository(UserIntent);
+    this.repository = AppDataSource.getRepository(SellerIntent);
   }
 
-  async create(data: CreateUserIntentRow): Promise<UserIntent> {
+  async create(data: CreateSellerIntentRow): Promise<SellerIntent> {
     const row = this.repository.create({
       userId: data.userId,
       propertyId: data.propertyId,
@@ -42,13 +48,13 @@ export class UserIntentRepo {
   async findLatestWithTargetPriceForOwner(
     propertyId: string,
     ownerUserId: string
-  ): Promise<UserIntent | null> {
+  ): Promise<SellerIntent | null> {
     return this.repository
-      .createQueryBuilder('ui')
-      .where('ui.propertyId = :propertyId', { propertyId })
-      .andWhere('ui.userId = :ownerUserId', { ownerUserId })
-      .andWhere('ui.targetPrice IS NOT NULL')
-      .orderBy('ui.createdAt', 'DESC')
+      .createQueryBuilder('si')
+      .where('si.propertyId = :propertyId', { propertyId })
+      .andWhere('si.userId = :ownerUserId', { ownerUserId })
+      .andWhere('si.targetPrice IS NOT NULL')
+      .orderBy('si.createdAt', 'DESC')
       .limit(1)
       .getOne();
   }

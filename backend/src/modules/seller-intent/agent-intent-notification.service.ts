@@ -1,6 +1,6 @@
 import type { User } from '../user/user.model';
 import { PropertyEstimate, PropertyType } from '../property-estimate/property-estimate.model';
-import { ProfileType, Timeline, SellPreference } from './user-intent.model';
+import { ProfileType, Timeline, SellPreference } from './seller-intent.model';
 import type { EmailSender } from './email-sender.interface';
 import { getPriceRangeIn5000 } from '../property-estimate/utils/price-range.util';
 

@@ -1,10 +1,10 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { AppError } from '../../utils/AppError';
-import { UserIntentService } from './user-intent.service';
-import type { CreateUserIntentBody } from './user-intent.schemas';
+import { SellerIntentService } from './seller-intent.service';
+import type { CreateSellerIntentBody } from './seller-intent.schemas';
 
-const userIntentService = new UserIntentService();
+const sellerIntentService = new SellerIntentService();
 
 function requireUserId(req: AuthenticatedRequest): string {
   if (!req.userId) {
@@ -13,10 +13,10 @@ function requireUserId(req: AuthenticatedRequest): string {
   return req.userId;
 }
 
-export async function createUserIntent(req: AuthenticatedRequest, res: Response): Promise<void> {
+export async function createSellerIntent(req: AuthenticatedRequest, res: Response): Promise<void> {
   const userId = requireUserId(req);
-  const body = req.body as CreateUserIntentBody;
-  const intent = await userIntentService.createIntent(userId, body);
+  const body = req.body as CreateSellerIntentBody;
+  const intent = await sellerIntentService.createIntent(userId, body);
   res.status(201).json({
     success: true,
     data: {
@@ -37,6 +37,6 @@ export async function createUserIntent(req: AuthenticatedRequest, res: Response)
 
 export async function getDvfPreview(req: AuthenticatedRequest, res: Response): Promise<void> {
   const propertyId = (req.params as { propertyId: string }).propertyId;
-  const preview = await userIntentService.getDvfPreview(propertyId);
+  const preview = await sellerIntentService.getDvfPreview(propertyId);
   res.json({ success: true, data: preview });
 }
