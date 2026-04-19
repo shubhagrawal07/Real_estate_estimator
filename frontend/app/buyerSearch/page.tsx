@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { consumeBuyerToastFlag } from '@/components/intent/intentSession';
 import { DEFAULT_CITY_CODE_INSEE, VAR_CITIES_NEAR_TOULON } from '@/constants/varCitiesNearToulon';
-import { buyerService } from '@/services/buyer.service';
+import { buyerSearchService } from '@/services/buyer-search.service';
 import styles from './page.module.css';
 
 const MIN_BUDGET = 0;
@@ -158,7 +158,7 @@ export default function BuyerSearchPage() {
             ? formData.minLandArea
             : undefined,
       };
-      const data = await buyerService.search(payload, token);
+      const data = await buyerSearchService.search(payload, token);
       sessionStorage.setItem('buyerSearchResults', JSON.stringify(data.properties));
       sessionStorage.setItem('buyerSearchCriteria', JSON.stringify({
         ...payload,

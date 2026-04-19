@@ -9,12 +9,12 @@ import {
   writeModalSession,
 } from '@/components/intent/intentSession';
 import {
-  flushPendingUserIntent,
+  flushPendingSellerIntent,
   navigateAfterSellerIntent,
-} from '@/lib/flush-pending-user-intent';
+} from '@/lib/flush-pending-seller-intent';
 
 /**
- * Completes pending user_intent saves after login when the estimate modal is no longer mounted (e.g. Flow C → /buyerSearch).
+ * Completes pending seller_intent saves after login when the estimate modal is no longer mounted (e.g. Flow C → /buyerSearch).
  */
 export default function PendingIntentFlusher() {
   const { data: session } = useSession();
@@ -32,7 +32,7 @@ export default function PendingIntentFlusher() {
     ran.current = true;
     void (async () => {
       try {
-        await flushPendingUserIntent(pending.resume, token);
+        await flushPendingSellerIntent(pending.resume, token);
         navigateAfterSellerIntent(pending.resume, router);
         if (pending.resume.kind === 'D_WATCH') {
           window.dispatchEvent(new CustomEvent('intent:areaWatchToast'));

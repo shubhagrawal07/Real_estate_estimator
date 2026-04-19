@@ -1,5 +1,4 @@
 import { PropertyEstimateRepo } from './property-estimate.repo';
-import { BuyerEngagementRepo, type PotentialBuyerRow } from '../buyer-engagement/buyer-engagement.repo';
 import {
   PropertyEstimate,
   PropertyType,
@@ -12,7 +11,6 @@ import { CityBlockSalesDataRepo } from '../city-block-sales-data/city-block-sale
 import { OutdoorSpace } from './entities/apartment-details.model';
 import { PoolOption, ExteriorLayoutQuality } from './entities/house-details.model';
 import { PropertyEstimateValuationService } from './property-estimate-valuation.service';
-import { AppError } from '../../utils/AppError';
 
 export interface CreatePropertyEstimateDto {
   address: string;
@@ -61,12 +59,10 @@ export interface CreatePropertyEstimateDto {
 export class PropertyEstimateService {
   private repo: PropertyEstimateRepo;
   private valuationService: PropertyEstimateValuationService;
-  private buyerEngagementRepo: BuyerEngagementRepo;
 
   constructor() {
     this.repo = new PropertyEstimateRepo();
     this.valuationService = new PropertyEstimateValuationService();
-    this.buyerEngagementRepo = new BuyerEngagementRepo();
   }
 
   async createEstimate(
@@ -176,28 +172,5 @@ export class PropertyEstimateService {
     }
   ): Promise<PropertyEstimate | null> {
     return this.repo.updateEngagement(propertyId, data, userId);
-  }
-
-  async getBuyerInterest(propertyId: string): Promise<{ hasHighBuyerInterest: boolean }> {
-    const maxLevel = await this.buyerEngagementRepo.getMaxEngagementLevelByPropertyId(propertyId);
-    return { hasHighBuyerInterest: maxLevel >= 10 };
-  }
-
-  /**
-   * Returns anonymous buyer engagement rows for a property. Only the property owner may call this.
-   * (Visibility in the UI may later be gated by buyerTracking; the API allows the owner regardless.)
-   */
-  async getPotentialBuyers(
-    propertyId: string,
-    userId: string
-  ): Promise<PotentialBuyerRow[]> {
-    const property = await this.repo.findOne(propertyId);
-    if (!property) {
-      throw new AppError('Estimate not found', 404);
-    }
-    if (property.userId !== userId) {
-      throw new AppError('You do not have permission to view potential buyers for this property', 403);
-    }
-    return this.buyerEngagementRepo.findByPropertyIdAnonymous(propertyId);
   }
 }

@@ -43,8 +43,8 @@ export type PendingResume =
       kind: 'A_CONFIRM' | 'B_CONFIRM';
       propertyId: string;
       targetPrice: number;
-      timeline: import('@/types/user-intent').Timeline;
-      sellPreference: import('@/types/user-intent').SellPreference;
+      timeline: import('@/types/seller-intent').Timeline;
+      sellPreference: import('@/types/seller-intent').SellPreference;
       notifyAgent: boolean;
       afterSave: 'close' | 'myEstimates' | 'buyerSearch';
     }

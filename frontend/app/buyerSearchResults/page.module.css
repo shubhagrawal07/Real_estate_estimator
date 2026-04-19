@@ -199,11 +199,49 @@
   }
 }
 
+.intentMenuButton {
+  position: absolute;
+  top: 2.5rem;
+  right: 0.5rem;
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.intentMenuButton:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.intentBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.intentBadge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+}
+
 .propertyItemContent {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding-bottom: 2rem;
+  padding-bottom: 0.75rem;
 }
 
 .propertyAddress {

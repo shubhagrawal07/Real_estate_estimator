@@ -51,51 +51,15 @@ export interface RankedProperty {
   bedroomScore: number;
   poolScore?: number;
   landAreaScore?: number;
-}
-
-export interface EngagementRecord {
-  engagementLevel: number;
-  interested: boolean;
-}
-
-export interface EngagementClickPayload {
-  propertyId: string;
-  budget: number;
-  bedrooms: number;
-  minSurfaceArea: number;
-  pool?: boolean;
-  minLandArea?: number | null;
-}
-
-export interface BatchEngagementsResponse {
-  engagements: Record<string, EngagementRecord>;
+  cityInseeCode: string;
+  cadastralSection: string;
+  locationCode: string;
 }
 
 export interface UpdateEngagementBody {
   feedback?: EstimateFeedback;
   buyerTracking?: boolean;
 }
-
-export interface BuyerInterestResponse {
-  hasHighBuyerInterest: boolean;
-}
-
-/** Anonymous potential buyer entry (budget + matching criteria only). */
-export interface PotentialBuyerEntry {
-  budget: number;
-  bedrooms: number;
-  surfaceMin: number;
-  landArea?: number | null;
-  pool: boolean;
-  engagementLevel: number;
-  interested: boolean;
-}
-
-export type FinancingStatus =
-  | 'ready_to_buy'
-  | 'in_progress'
-  | 'not_yet'
-  | 'need_to_sell_first';
 
 export interface SellerAlertItem {
   id: string;
