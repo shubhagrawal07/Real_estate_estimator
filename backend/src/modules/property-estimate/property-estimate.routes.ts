@@ -10,6 +10,7 @@ import {
   recalculate,
   remove,
   updateEngagement,
+  getPotentialBuyers,
 } from './property-estimate.controller';
 import { asyncHandler } from '../../middleware/error.middleware';
 import { validateBody, validateParams } from '../../middleware/validate-zod.middleware';
@@ -30,6 +31,12 @@ router.patch(
   validateParams(idParamSchema),
   validateBody(updateEngagementBodySchema),
   asyncHandler(updateEngagement)
+);
+router.get(
+  '/:id/potential-buyers',
+  authenticateToken,
+  validateParams(idParamSchema),
+  asyncHandler(getPotentialBuyers)
 );
 
 export default router;

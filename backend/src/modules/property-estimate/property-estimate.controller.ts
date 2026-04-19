@@ -90,3 +90,10 @@ export async function updateEngagement(req: AuthenticatedRequest, res: Response)
   }
   res.json(serializeEstimate(estimate));
 }
+
+export async function getPotentialBuyers(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = requireUserId(req);
+  const id = (req.params as { id: string }).id;
+  const list = await propertyEstimateService.getPotentialBuyers(id, userId);
+  res.json(list);
+}

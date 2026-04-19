@@ -55,13 +55,17 @@ export class BuyerSearchService {
   /**
    * Search and rank properties based on buyer criteria.
    * When cadastralSection is omitted, matches all cadastral sections in the city.
+   * @param excludeUserId — logged-in buyer; their own listings are omitted from results.
    */
-  async searchProperties(searchDto: BuyerSearchDto): Promise<RankedProperty[]> {
+  async searchProperties(searchDto: BuyerSearchDto, excludeUserId?: string): Promise<RankedProperty[]> {
     const allProperties = await this.propertyRepo.findAll();
     const matchByCityOnly = !searchDto.cadastralSection || searchDto.cadastralSection.length === 0;
 
     // Filter properties by city (and optionally cadastral section) and property type
     const filteredProperties = allProperties.filter((property) => {
+      if (excludeUserId && property.userId === excludeUserId) {
+        return false;
+      }
       const propertyLocation = parseLocationCode(property.locationCode);
       if (!propertyLocation) return false;
 

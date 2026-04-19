@@ -72,4 +72,12 @@ export class BuyerIntentRepo {
     }
     return out;
   }
+
+  /** All intent rows for a property (seller-side aggregation; caller enforces ownership). */
+  async findByPropertyId(propertyId: string): Promise<BuyerIntent[]> {
+    return this.repository.find({
+      where: { propertyId },
+      order: { createdAt: 'DESC' },
+    });
+  }
 }

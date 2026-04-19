@@ -11,7 +11,7 @@ export async function search(req: AuthenticatedRequest, res: Response): Promise<
     throw new AppError('User ID not found', 401);
   }
   const body = req.body as BuyerSearchBody;
-  const rankedProperties = await buyerSearchService.searchProperties(body);
+  const rankedProperties = await buyerSearchService.searchProperties(body, req.userId);
   res.json({
     properties: rankedProperties,
     count: rankedProperties.length,

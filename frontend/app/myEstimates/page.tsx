@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import EstimateDisplay from '@/components/EstimateDisplay';
+import PotentialBuyersModal from '@/components/PotentialBuyersModal';
 import { HoverTooltip } from '@/components/HoverTooltip';
 import { useMyEstimates, useFavourites, type EstimateItem } from '@/hooks/useMyEstimates';
 import { getPriceRangeIn5000 } from '@/lib/price-range';
@@ -89,6 +90,7 @@ export default function MyEstimatesPage() {
   const [intentModalProperty, setIntentModalProperty] = useState<BuyerIntentModalProperty | null>(null);
   const [intentFlags, setIntentFlags] = useState<Record<string, BuyerIntentFlags>>({});
   const intentContextEstimateRef = useRef<EstimateItem | null>(null);
+  const [potentialBuyersPropertyId, setPotentialBuyersPropertyId] = useState<string | null>(null);
   const error = activeTab === 'estimates' ? errorEstimates : errorFavourites;
 
   useEffect(() => {
@@ -103,8 +105,11 @@ export default function MyEstimatesPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (!token) return;
-    const list = activeTab === 'estimates' ? estimates : favourites;
+    if (!token || activeTab === 'estimates') {
+      setIntentFlags({});
+      return;
+    }
+    const list = favourites;
     if (list.length === 0) {
       setIntentFlags({});
       return;
@@ -114,7 +119,7 @@ export default function MyEstimatesPage() {
       .batchFlags(ids, token)
       .then(setIntentFlags)
       .catch(() => {});
-  }, [token, activeTab, estimates, favourites]);
+  }, [token, activeTab, favourites]);
 
   const fetchEstimate = async (estimateId: string) => {
     setLoading(true);
@@ -258,6 +263,8 @@ export default function MyEstimatesPage() {
     }).format(price);
   };
 
+  const isBuyerTrackingEnabled = (estimate: EstimateItem) => estimate.buyerTracking !== false;
+
   if (!token) {
     return (
       <div className={styles.container}>
@@ -352,17 +359,18 @@ export default function MyEstimatesPage() {
                           })()
                         : 'N/A'}
                     </div>
-                    {(intentFlags[estimate.propertyId]?.highInterest ||
-                      intentFlags[estimate.propertyId]?.alertActive) && (
-                      <div className={styles.intentBadgeRow}>
-                        {intentFlags[estimate.propertyId]?.highInterest && (
-                          <span className={styles.intentBadge}>● You&apos;re interested</span>
-                        )}
-                        {intentFlags[estimate.propertyId]?.alertActive && (
-                          <span className={styles.intentBadge}>🔔 Alert active</span>
-                        )}
-                      </div>
-                    )}
+                    {activeTab === 'favourites' &&
+                      (intentFlags[estimate.propertyId]?.highInterest ||
+                        intentFlags[estimate.propertyId]?.alertActive) && (
+                        <div className={styles.intentBadgeRow}>
+                          {intentFlags[estimate.propertyId]?.highInterest && (
+                            <span className={styles.intentBadge}>● You&apos;re interested</span>
+                          )}
+                          {intentFlags[estimate.propertyId]?.alertActive && (
+                            <span className={styles.intentBadge}>🔔 Alert active</span>
+                          )}
+                        </div>
+                      )}
                   </div>
                   <div className={styles.estimateActions}>
                     <HoverTooltip label="View on map" block>
@@ -379,22 +387,39 @@ export default function MyEstimatesPage() {
                         🗺️ View on Map
                       </button>
                     </HoverTooltip>
-                    <div className={styles.estimateIconActions}>
-                      <HoverTooltip label="Your interest in this property">
+                    {activeTab === 'estimates' && isBuyerTrackingEnabled(estimate) && (
+                      <HoverTooltip label="Buyers who expressed intent on this listing (anonymous)" block>
                         <button
                           type="button"
-                          className={styles.intentMenuButton}
+                          className={styles.potentialBuyersButton}
                           onClick={(e) => {
                             e.stopPropagation();
-                            intentContextEstimateRef.current = estimate;
-                            setIntentModalProperty(toBuyerIntentModalProperty(estimate));
-                            setIntentModalOpen(true);
+                            setPotentialBuyersPropertyId(estimate.propertyId);
                           }}
-                          aria-label="Property actions"
+                          aria-label="Potential buyers"
                         >
-                          ⋯
+                          Potential buyers
                         </button>
                       </HoverTooltip>
+                    )}
+                    <div className={styles.estimateIconActions}>
+                      {activeTab === 'favourites' && (
+                        <HoverTooltip label="Your interest in this property">
+                          <button
+                            type="button"
+                            className={styles.intentMenuButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              intentContextEstimateRef.current = estimate;
+                              setIntentModalProperty(toBuyerIntentModalProperty(estimate));
+                              setIntentModalOpen(true);
+                            }}
+                            aria-label="Property actions"
+                          >
+                            ⋯
+                          </button>
+                        </HoverTooltip>
+                      )}
                       {activeTab === 'estimates' && (
                         <HoverTooltip label="Delete this estimate">
                           <button
@@ -483,8 +508,8 @@ export default function MyEstimatesPage() {
         property={intentModalProperty}
         token={token}
         onSaved={async () => {
-          const list = activeTab === 'estimates' ? estimates : favourites;
-          const ids = list.map((e) => e.propertyId);
+          if (activeTab !== 'favourites') return;
+          const ids = favourites.map((e) => e.propertyId);
           if (!token || ids.length === 0) return;
           try {
             const m = await buyerIntentService.batchFlags(ids, token);
@@ -494,6 +519,13 @@ export default function MyEstimatesPage() {
           }
         }}
         onAreaInterest={handleMyEstimatesAreaNavigate}
+      />
+
+      <PotentialBuyersModal
+        open={potentialBuyersPropertyId !== null}
+        onClose={() => setPotentialBuyersPropertyId(null)}
+        propertyId={potentialBuyersPropertyId ?? ''}
+        token={token}
       />
 
       {deleteConfirm.show && (

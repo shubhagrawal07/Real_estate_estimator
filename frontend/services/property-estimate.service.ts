@@ -1,5 +1,9 @@
 import { api } from './api';
-import type { PropertyEstimateResponse, UpdateEngagementBody } from '@/types/estimate';
+import type {
+  PropertyEstimateResponse,
+  UpdateEngagementBody,
+  PotentialBuyerEntry,
+} from '@/types/estimate';
 
 export const propertyEstimateService = {
   create: (body: unknown, token?: string | null) =>
@@ -34,4 +38,7 @@ export const propertyEstimateService = {
       body,
       token
     ),
+
+  getPotentialBuyers: (propertyId: string, token: string) =>
+    api.get<PotentialBuyerEntry[]>(`/property-estimate/${propertyId}/potential-buyers`, token),
 };

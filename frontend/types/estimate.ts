@@ -61,6 +61,19 @@ export interface UpdateEngagementBody {
   buyerTracking?: boolean;
 }
 
+/** Anonymous potential buyer row (from buyer intent aggregation). */
+export interface PotentialBuyerEntry {
+  budget: number | null;
+  bedrooms: number;
+  surfaceMin: number;
+  landArea?: number | null;
+  pool: boolean;
+  engagementLevel: number;
+  interested: boolean;
+  /** Shown instead of bedrooms/surface when present. */
+  criteriaSummary?: string;
+}
+
 export interface SellerAlertItem {
   id: string;
   type: string;
