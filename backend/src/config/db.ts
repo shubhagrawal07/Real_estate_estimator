@@ -11,6 +11,7 @@ import { BuyerEngagement } from '../modules/buyer-engagement/buyer-engagement.mo
 import { SellerAlert } from '../modules/seller-alert/seller-alert.model';
 import { UserIntent } from '../modules/user-intent/user-intent.model';
 import { config } from './env';
+import { refreshCityBlockSalesDataFromSqlFile } from './city-block-sales-sql-seed';
 import { logger } from '../utils/logger';
 
 export const AppDataSource = new DataSource({
@@ -119,6 +120,10 @@ export const initializeDatabase = async (): Promise<void> => {
     
     await AppDataSource.initialize();
     logger.info('Database connected successfully');
+
+    if (config.refreshCityBlockSalesDataOnStartup) {
+      await refreshCityBlockSalesDataFromSqlFile(AppDataSource);
+    }
   } catch (error) {
     logger.error('Error connecting to database', {
       message: error instanceof Error ? error.message : String(error),

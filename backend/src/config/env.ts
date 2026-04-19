@@ -4,6 +4,14 @@ dotenv.config();
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 
+function parseOptionalBooleanEnv(raw: string | undefined, defaultValue: boolean): boolean {
+  if (raw === undefined || raw.trim() === '') return defaultValue;
+  const v = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes'].includes(v)) return true;
+  if (['0', 'false', 'no'].includes(v)) return false;
+  return defaultValue;
+}
+
 const requiredProductionVars = [
   'JWT_SECRET',
   'GOOGLE_CLIENT_ID',
@@ -57,6 +65,14 @@ export const config = {
     baseUrl: process.env.DVF_API_BASE_URL || 'https://apidf-preprod.cerema.fr/dvf_opendata/mutations/',
     timeoutMs: parseInt(process.env.DVF_API_TIMEOUT_MS || '90000', 10),
   },
+  /**
+   * When true, truncates `city_block_sales_data` on startup and loads `backend/sql/city_block_sales_data.sql`.
+   * Defaults to true when NODE_ENV is not production (local dev). Set to true explicitly to enable in production.
+   */
+  refreshCityBlockSalesDataOnStartup: parseOptionalBooleanEnv(
+    process.env.REFRESH_CITY_BLOCK_SALES_DATA_ON_STARTUP,
+    nodeEnv !== 'production'
+  ),
   /** JSON map: location_code (full or code_insee prefix) → agent user UUID */
   agentByLocationMap: parseAgentByLocationMap(process.env.AGENT_BY_LOCATION_MAP),
 };
