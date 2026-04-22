@@ -3,6 +3,8 @@ import { PropertyEstimate, PropertyType } from '../property-estimate/property-es
 import { ProfileType, Timeline, SellPreference } from './seller-intent.model';
 import type { EmailSender } from './email-sender.interface';
 import { getPriceRangeIn5000 } from '../property-estimate/utils/price-range.util';
+import { ZoneRepo } from '../zone/zone.repo';
+import { resolveAgentNotificationEmail } from '../zone/resolve-agent-notification-email';
 
 export interface SellerIntentNotificationInput {
   profileType: ProfileType.SELLER | ProfileType.SELLER_BUYER;
@@ -15,9 +17,16 @@ export interface SellerIntentNotificationInput {
 
 /** Builds subject/body per product template; sends via EmailSender (stub or future SMTP). */
 export class AgentIntentNotificationService {
-  constructor(private readonly emailSender: EmailSender) {}
+  constructor(
+    private readonly emailSender: EmailSender,
+    private readonly zoneRepo: ZoneRepo = new ZoneRepo()
+  ) {}
 
   async notifySellerIntent(input: SellerIntentNotificationInput): Promise<void> {
+    const toAgentEmail = await resolveAgentNotificationEmail(
+      input.property.locationCode,
+      this.zoneRepo
+    );
     const { min, max } = getPriceRangeIn5000(input.property.estimatedPrice ?? 0);
     const typeStr = input.property.type === PropertyType.APARTMENT ? 'Apartment' : 'House';
     const profileLabel =
@@ -37,7 +46,7 @@ export class AgentIntentNotificationService {
     await this.emailSender.sendSellerIntentEmail({
       subject,
       body,
-      toAgentEmail: undefined,
+      toAgentEmail,
     });
   }
 }

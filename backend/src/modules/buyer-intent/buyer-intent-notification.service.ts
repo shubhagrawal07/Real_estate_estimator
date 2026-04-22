@@ -3,11 +3,17 @@ import type { User } from '../user/user.model';
 import type { EmailSender } from '../seller-intent/email-sender.interface';
 import { getPriceRangeIn5000 } from '../property-estimate/utils/price-range.util';
 import { BuyerIntentType } from './buyer-intent.model';
+import { ZoneRepo } from '../zone/zone.repo';
+import { resolveAgentNotificationEmail } from '../zone/resolve-agent-notification-email';
 
 export class BuyerIntentNotificationService {
-  constructor(private readonly emailSender: EmailSender) {}
+  constructor(
+    private readonly emailSender: EmailSender,
+    private readonly zoneRepo: ZoneRepo = new ZoneRepo()
+  ) {}
 
   async notifyHighInterest(property: PropertyEstimate, buyer: User): Promise<void> {
+    const toAgentEmail = await resolveAgentNotificationEmail(property.locationCode, this.zoneRepo);
     const { min, max } = getPriceRangeIn5000(property.estimatedPrice ?? 0);
     const typeStr = property.type === PropertyType.APARTMENT ? 'Apartment' : 'House';
     const subject = `❤️ Buyer very interested — ${property.address}`;
@@ -22,7 +28,7 @@ export class BuyerIntentNotificationService {
     await this.emailSender.sendBuyerIntentEmail({
       subject,
       body,
-      toAgentEmail: undefined,
+      toAgentEmail,
     });
   }
 
@@ -31,6 +37,7 @@ export class BuyerIntentNotificationService {
     buyer: User,
     message: string
   ): Promise<void> {
+    const toAgentEmail = await resolveAgentNotificationEmail(property.locationCode, this.zoneRepo);
     const { min, max } = getPriceRangeIn5000(property.estimatedPrice ?? 0);
     const typeStr = property.type === PropertyType.APARTMENT ? 'Apartment' : 'House';
     const subject = `💬 Buyer question — ${property.address}`;
@@ -46,7 +53,7 @@ export class BuyerIntentNotificationService {
     await this.emailSender.sendBuyerIntentEmail({
       subject,
       body,
-      toAgentEmail: undefined,
+      toAgentEmail,
     });
   }
 }

@@ -1,4 +1,3 @@
-import { config } from '../../config/env';
 import { AppError } from '../../utils/AppError';
 import { PropertyEstimateRepo } from '../property-estimate/property-estimate.repo';
 import { PropertyType } from '../property-estimate/property-estimate.model';
@@ -10,6 +9,7 @@ import { ProfileType, SellerIntent } from './seller-intent.model';
 import type { CreateSellerIntentBody } from './seller-intent.schemas';
 import { AgentIntentNotificationService } from './agent-intent-notification.service';
 import { ConsoleEmailSender } from './console-email-sender';
+import { ZoneRepo } from '../zone/zone.repo';
 
 export interface DvfPreviewRow {
   typeLabel: string;
@@ -22,12 +22,15 @@ export interface DvfPreviewResult {
   rows: DvfPreviewRow[];
 }
 
-function resolveAgentId(locationCode: string): string | null {
-  const m = config.agentByLocationMap;
-  const exact = m[locationCode];
-  if (exact) return exact;
-  const cinsee = locationCode.slice(0, 5);
-  return m[cinsee] ?? null;
+async function resolveAgentIdFromZone(
+  locationCode: string | undefined,
+  zoneRepo: ZoneRepo
+): Promise<string | null> {
+  const code = locationCode?.trim();
+  if (!code) return null;
+  const zone = await zoneRepo.findByZoneCode(code);
+  if (!zone) return null;
+  return zone.agentId ?? null;
 }
 
 function mapPropertyTypeToDvf(type: PropertyType): 'APPARTEMENT' | 'MAISON' {
@@ -45,12 +48,14 @@ export class SellerIntentService {
   private userRepo: UserRepo;
   private intentRepo: SellerIntentRepo;
   private notifyService: AgentIntentNotificationService;
+  private zoneRepo: ZoneRepo;
 
   constructor() {
     this.propertyRepo = new PropertyEstimateRepo();
     this.salesRepo = new CityBlockSalesDataRepo();
     this.userRepo = new UserRepo();
     this.intentRepo = new SellerIntentRepo();
+    this.zoneRepo = new ZoneRepo();
     this.notifyService = new AgentIntentNotificationService(new ConsoleEmailSender());
   }
 
@@ -87,7 +92,7 @@ export class SellerIntentService {
       throw new AppError('You do not have permission to save intent for this property', 403);
     }
 
-    const agentId = resolveAgentId(property.locationCode);
+    const agentId = await resolveAgentIdFromZone(property.locationCode, this.zoneRepo);
 
     let notifSent = false;
     if (body.notifyAgent && (body.profileType === ProfileType.SELLER || body.profileType === ProfileType.SELLER_BUYER)) {

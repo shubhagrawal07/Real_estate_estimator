@@ -75,6 +75,15 @@ export const config = {
   ),
   /** JSON map: location_code (full or code_insee prefix) → agent user UUID */
   agentByLocationMap: parseAgentByLocationMap(process.env.AGENT_BY_LOCATION_MAP),
+  notifications: {
+    /**
+     * Used when no `zones` row matches the property location code, the zone has no agent,
+     * or the agent has no email. Override with DEFAULT_AGENT_NOTIFICATION_EMAIL.
+     */
+    defaultAgentNotificationEmail:
+      (process.env.DEFAULT_AGENT_NOTIFICATION_EMAIL || '').trim() ||
+      'iemirates0710@gmail.com',
+  },
 };
 
 function parseAgentByLocationMap(raw: string | undefined): Record<string, string> {
